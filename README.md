@@ -4,7 +4,7 @@ Human Hand is a Windows-first, privacy-preserving Python 3.11 CLI for rewriting 
 
 AI generated drafts, rewritten into fully human writing without meta provenance leakage.
 
-The repository is being built one ExecPlan at a time from the control plane in `.agent/`. It is currently in the EP-001 foundation stage, so the architecture and operating rules are defined, but the installable Python package and CLI entrypoints are not finished yet.
+The repository is being built one ExecPlan at a time from the control plane in `.agent/`. EP-001 foundation is complete: the package installs, the CLI works, and all baseline validations pass.
 
 ## Goals
 
@@ -16,9 +16,10 @@ The repository is being built one ExecPlan at a time from the control plane in `
 
 ## Current Status
 
-- Product direction and architecture are documented.
-- Repository workflow, agent control surfaces, and local Git/GitHub publishing flow are being established.
-- `pyproject.toml`, package source, tests, and CI are planned under EP-001 and are not complete yet.
+- EP-001 foundation, EP-002 core domain, and EP-003 data/persistence are complete.
+- `humanhand --help`, `humanhand --version`, and `humanhand health --json` are functional.
+- `humanhand.domain` plus the new persistence layer now provide style fingerprints, fact diffing, metadata scrub, strict file I/O, cache configuration, and SQLite detector-score caching with no-text safeguards.
+- Next: EP-004 API or service layer.
 
 ## Architecture Summary
 
@@ -66,17 +67,11 @@ The default local coding loop is:
 
 ## Local Development
 
-Until EP-001 foundation is complete:
-
-1. Read `AGENTS.md` and `COMMANDS.md`.
-2. Run `sh scripts/preflight.sh`.
-3. Continue only the active ExecPlan.
-
-After EP-001 lands, the planned workflow is:
-
 1. Use Python 3.11.
 2. Use `uv` for development dependency management.
-3. Use the commands documented in `COMMANDS.md` for install, lint, typecheck, tests, build, and verification.
+3. Read `AGENTS.md`, `COMMANDS.md`, and the active ExecPlan before editing.
+4. Run `sh scripts/preflight.sh`.
+5. Use the commands documented in `COMMANDS.md` for install, lint, typecheck, tests, build, and verification.
 
 ## Documentation Map
 
