@@ -171,6 +171,8 @@ If files already exist, inspect and minimally update them. Do not overwrite user
 - 2026-07-06: `rtk git diff --name-only` failed with `warning: Not a git repository` even though a `.git/` path exists. Narrow diagnostics showed `.git/` is present but empty, with no `HEAD` or `config`, so final diff review cannot run until the checkout is repaired or initialized.
 - 2026-07-06: `gh auth status` showed the configured `dominator509` token is invalid for local GitHub CLI usage, even though the Codex GitHub connector can access `dominator509/HumanHand`.
 - 2026-07-06: The existing remote GitHub repository `dominator509/HumanHand` already exists as a private repository with default branch `main`.
+- 2026-07-06: `git push -u origin main` proved push authentication works from the desktop-user Git context, but Git rejected the push because `origin/main` already contained a prior README commit.
+- 2026-07-06: Renaming the local folder from `C:\dev\Human Hand` to `C:\dev\HumanHand` failed because another process was locking the active folder, and the user identified Obsidian as the likely locker.
 
 ## Decision Log
 
@@ -182,6 +184,8 @@ If files already exist, inspect and minimally update them. Do not overwrite user
 - 2026-07-06: Created a repository `.gitignore` that ignores transient caches, agent state, local Serena state, and local Obsidian workspace state while keeping durable repo docs and shared config versionable. Reason: the user asked for a proper Git ignore policy before initial publish. Consequence: local-only workspace noise should not pollute future commits or Codex sidebar state.
 - 2026-07-06: Created `README.md` from the architecture and project brief, documenting product scope, privacy rules, current EP-001 status, and the planned layer boundaries. Reason: the user explicitly requested a README built from the architecture before initial commit/push. Consequence: EP-001 documentation baseline is partially advanced without claiming the full milestone complete.
 - 2026-07-06: Recreated `.git/` under the desktop user context, set local Git author to `dominator509 <155886966+dominator509@users.noreply.github.com>`, and configured `origin` to `https://github.com/dominator509/HumanHand.git`. Reason: the original `.git/` was an empty broken stub and Codex sidebar Git actions need a valid local repo plus remote. Consequence: local Git metadata now matches the intended GitHub repository, but push still depends on valid desktop authentication.
+- 2026-07-06: After the first push showed an existing remote README commit, the user explicitly authorized squashing the remote state. Reason: preserving the prior remote contents was no longer required. Consequence: force-pushing `main` is allowed for this setup session and is the simplest way to align the remote with the new local baseline.
+- 2026-07-06: After the rename lock surfaced, the user decided not to rename the local folder because Obsidian likely treats it as an active vault and changing the path could create more problems. Reason: repo path consistency was less important than keeping the local tooling stable. Consequence: the local checkout remains `C:\dev\Human Hand` while the GitHub repo remains `HumanHand`, and Git/GitHub setup should proceed without further folder-path changes.
 
 ## Outcomes & Retrospective
 

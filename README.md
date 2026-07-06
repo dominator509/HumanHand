@@ -2,6 +2,8 @@
 
 Human Hand is a Windows-first, privacy-preserving Python 3.11 CLI for rewriting AI-assisted source text into a supplied human writing style while preserving facts, stripping metadata, and supporting verification workflows.
 
+AI generated drafts, rewritten into fully human writing without meta provenance leakage.
+
 The repository is being built one ExecPlan at a time from the control plane in `.agent/`. It is currently in the EP-001 foundation stage, so the architecture and operating rules are defined, but the installable Python package and CLI entrypoints are not finished yet.
 
 ## Goals

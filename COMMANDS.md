@@ -42,9 +42,12 @@ Use `uv` for development. End users install the built wheel with `pip`. Do not r
 | Stage tracked work | `git add .` | No stdout on success |
 | Create commit | `git commit -m "<message>"` | Commit summary with created/changed files |
 | Show remotes | `git remote -v` | Configured remotes list |
+| Fetch origin | `git fetch origin` | Remote refs updated locally |
+| Pull origin main with unrelated histories allowed | `git pull --no-rebase --allow-unrelated-histories origin main` | Remote history merged into local branch |
 | GitHub auth status | `gh auth status` | Logged-in GitHub account and host status |
 | Create GitHub repo and push | `gh repo create <name> --private --source . --remote origin --push` | GitHub repo created and branch pushed |
 | Push current branch | `git push -u origin main` | Upstream set and branch pushed |
+| Force-push current branch with lease | `git push --force-with-lease -u origin main` | Remote branch replaced and upstream set |
 | Local CLI help | `uv run humanhand --help` | Typer help text on stdout |
 | Local CLI version | `uv run humanhand --version` | Version text on stdout |
 | Local rewrite command | `uv run humanhand rewrite --source <source.txt> --style <style.txt> --out <output.txt>` | Status on stderr; output file created |
