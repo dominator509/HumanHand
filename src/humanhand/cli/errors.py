@@ -61,7 +61,7 @@ def get_error_message(key: str, fallback: str | None = None) -> str:
 
 
 def error_for_exception(exc: Exception) -> str:
-    """Map a known exception type to a user-friendly message key.
+    """Map a known exception instance to a stable message key.
 
     Args:
         exc: The exception to map.
@@ -70,15 +70,67 @@ def error_for_exception(exc: Exception) -> str:
         A message key suitable for ``get_error_message``.
     """
     name = type(exc).__name__
-    mapping: dict[str, str] = {
-        "FileIOError": "file_not_found",
-        "FileNotFoundError": "file_not_found",
-        "LlmError": "llm_error",
-        "DetectorError": "detector_unavailable",
-        "ProviderUnavailableError": "provider_no_docs",
-        "ValueError": "missing_argument",
-        "KeyError": "schema_invalid",
-        "TypeError": "schema_invalid",
-        "RewriteQualityError": "fact_drift",
-    }
-    return mapping.get(name, "internal_error")
+    message = str(exc).lower()
+
+    if name in {"FileIOError", "FileNotFoundError"}:
+        if message.startswith("file not found"):
+            return "file_not_found"
+        if message.startswith("not a regular file"):
+            return "not_a_file"
+        if "bom" in message:
+            return "bom_detected"
+        if "invalid utf-8" in message:
+            return "invalid_utf8"
+        if "whitespace-only" in message or "empty" in message:
+            return "whitespace_only"
+        if message.startswith("cannot read file"):
+            return "cannot_read"
+        if message.startswith("cannot create output directory"):
+            return "cannot_write"
+        if message.startswith("cannot write output file"):
+            return "cannot_write"
+        if message.startswith("output path must not match"):
+            return "output_is_input"
+
+    if name == "LlmError":
+        if "timed out" in message:
+            return "llm_timeout"
+        if "http is not allowed" in message or "https" in message:
+            return "unsafe_endpoint"
+        return "llm_error"
+
+    if name == "DetectorError":
+        return "detector_unavailable"
+
+    if name == "ProviderUnavailableError":
+        if "api key" in message or "_api_key" in message:
+            return "provider_no_key"
+        return "provider_no_docs"
+
+    if name == "RewriteQualityError":
+        return "fact_drift"
+
+    if name == "ValueError":
+        if "source text must not be empty" in message:
+            return "empty_source"
+        if "style text must not be empty" in message:
+            return "empty_style"
+        if "source text exceeds" in message:
+            return "source_too_large"
+        if "style text exceeds" in message:
+            return "style_too_large"
+        if "unknown detector provider" in message:
+            return "unknown_provider"
+        if "must be a positive" in message or "boolean-like" in message:
+            return "config_invalid"
+        return "missing_argument"
+
+    if name in {"KeyError", "TypeError"}:
+        return "schema_invalid"
+
+    return "internal_error"
+
+
+def message_for_exception(exc: Exception, fallback: str | None = None) -> str:
+    """Return the stable user-facing message for a known exception."""
+    return get_error_message(error_for_exception(exc), fallback)

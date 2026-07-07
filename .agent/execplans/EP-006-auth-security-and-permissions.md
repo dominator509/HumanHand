@@ -1,10 +1,10 @@
 ---
 id: EP-006
 title: Auth, Security, and Permissions
-status: not_started
+status: completed
 owner: agent
 created: 2026-07-05
-updated: 2026-07-05
+updated: 2026-07-06
 ---
 
 # EP-006: Auth, Security, and Permissions
@@ -48,6 +48,7 @@ Human Hand is a single-user local CLI. Security baseline still matters because u
 Expected files:
 
 - `src/humanhand/infra/logging.py`
+- `src/humanhand/cli/app.py`
 - `src/humanhand/infra/config.py`
 - `src/humanhand/infra/http.py`
 - `src/humanhand/infra/llm.py`
@@ -144,20 +145,35 @@ Security hardening can be rerun safely. Do not weaken redaction or endpoint rule
 
 ## Progress
 
-- [ ] M1 — Confirm auth is absent and `.env` ignored.
-- [ ] M2 — Harden redaction and logging safety.
-- [ ] M3 — Harden endpoint and schema validation.
-- [ ] M4 — Prove no text persistence and safe permissions.
-- [ ] M5 — Security verification.
+- [x] M1 — Confirm auth is absent and `.env` ignored.
+- [x] M2 — Harden redaction and logging safety.
+- [x] M3 — Harden endpoint and schema validation.
+- [x] M4 — Prove no text persistence and safe permissions.
+- [x] M5 — Security verification.
 
 ## Surprises & Discoveries
 
-- None yet.
+- `src/humanhand/infra/logging.py` did not exist prior to EP-006 and was created fresh with JSONL stderr logging, recursive redaction, and safe helpers.
+- Secret scan grep in `scripts/security-check.sh` flagged test fixtures with fake API key patterns — excluded `tests/` directory from the scan.
+- `llm.py` did not validate that `content` is not `None` after extraction; added `isinstance` guard to reject `None`/non-string content.
+- pytest's `capsys` fixture is more reliable than manual `sys.stderr` redirection via `StringIO` on Windows for log capture tests.
+- Codex audit found that the live CLI still emitted JSONL via `_CliLogger` in `src/humanhand/cli/app.py`, so the new infra redaction helper was not yet protecting the runtime logger path.
 
 ## Decision Log
 
 - 2026-07-05: No auth implementation will be added. Reason: product is single-user local CLI. Consequence: security work focuses on secrets, text handling, endpoints, and filesystem permissions.
+- 2026-07-06: Excluded `tests/` directory from secret-scan grep in `scripts/security-check.sh`. Reason: redaction tests contain fake key patterns needed for testing. Consequence: test files are not scanned for secret patterns but src/ still is.
+- 2026-07-06: Excluded `logging.py` and `test_redaction.py` from the `.env` secret-pattern scan in `test_secrets_from_env_only`. Reason: these files define redaction regex patterns (not real secrets). Consequence: false positives are suppressed at the test level.
+- 2026-07-06: Added `None`/non-string content validation to `llm.py`. Reason: `None` could pass through the existing `KeyError`/`IndexError`/`TypeError` guards and return silently. Consequence: malformed LLM responses now raise `LlmError`.
+- 2026-07-06: Codex audit updated `src/humanhand/cli/app.py`, even though it was not in the original Files to Change list. Reason: the actual runtime stderr logger lived there and still bypassed the new redaction helper. Consequence: live CLI JSONL logs now redact secret/user-text fields the same way the new infra logging module does.
+- 2026-07-06: `.agent/state/continuation.md` will be refreshed during the audit handoff even though it is not listed in Files to Change. Reason: the local Claude-to-Codex loop depends on current pause/resume state at each ExecPlan boundary. Consequence: the next Claude run can resume from audited state instead of chat history.
+- 2026-07-06: Existing EP-005 audit carryover edits remained in the worktree during the EP-006 review (`README.md`, `src/humanhand/cli/errors.py`, `tests/e2e/test_cli_errors.py`, and `.agent/execplans/EP-005-user-interface-or-client.md`). Reason: the repository was handed off with those earlier audit changes still uncommitted. Consequence: EP-006 diff review distinguishes new security work from pre-existing EP-005 carryover files.
 
 ## Outcomes & Retrospective
 
-Not started.
+EP-006 completed successfully, including the Codex audit/fix pass. Summary:
+
+- **Added**: `logging.py` (JSONL structured logging + recursive redaction), `test_redaction.py` (47 unit tests), `test_security_baseline.py` (8 integration tests), `test_endpoint_security.py` (21 integration tests), `test_no_text_persistence.py` (23 integration tests).
+- **Hardened**: `llm.py` (null content guard), `scripts/security-check.sh` (test exclusion), and the live CLI logger in `src/humanhand/cli/app.py` (runtime redaction now uses the new infra helper).
+- **Confirmed**: No auth modules, classes, CLI commands, or account tables exist. `.env` properly gitignored. No dotenv auto-loader. Cache never stores user text. Logs never leak user text or secrets. Endpoints enforce HTTPS. Responses are schema-validated.
+- **Validation**: `verify.sh` exits 0. 168 unit + 143 integration + 141 e2e + 21 smoke tests pass. Bandit clean. Dependency audit clean. Secret scan clean.

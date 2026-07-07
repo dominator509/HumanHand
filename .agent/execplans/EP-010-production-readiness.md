@@ -166,21 +166,53 @@ Production readiness checks can be rerun. Do not weaken readiness scripts. If a 
 
 ## Progress
 
-- [ ] M1 — Full verification baseline.
-- [ ] M2 — Security and privacy review.
-- [ ] M3 — Performance, accessibility, and observability review.
-- [ ] M4 — Deployment dry run and rollback drill.
-- [ ] M5 — Production readiness gate.
-- [ ] M6 — Final diff and launch report.
+- [x] M1 — Full verification baseline.
+- [x] M2 — Security and privacy review.
+- [x] M3 — Performance, accessibility, and observability review.
+- [x] M4 — Deployment dry run and rollback drill.
+- [x] M5 — Production readiness gate.
+- [x] M6 — Final diff and launch report.
 
 ## Surprises & Discoveries
 
-- None yet.
+- All readiness scripts (`production-readiness-check.sh`, `loop.sh`) already existed and worked correctly — no new code needed.
+- The `production-readiness-check.sh` requires `dist/` containing build artifacts; building first was necessary.
+- Smoke suite completed in 0.87s — well under the 30-second threshold.
+- `pip-audit` correctly reports humanhand as "not found on PyPI" (expected for pre-release).
+- All 12 production-readiness docs exist, are substantive, and are internally consistent.
+- Only 2 minor README issues found across the entire doc audit: missing EP-000 reference and stale test count (765→774).
 
 ## Decision Log
 
 - 2026-07-05: Production readiness does not equal publish. Reason: release/publish requires maintainer approval. Consequence: this plan can verify artifacts but must not tag or publish.
+- 2026-07-07: License remains unset. Reason: maintainer has not chosen a license. Consequence: packaging metadata avoids false license claims until decision is made.
+- 2026-07-07: `humanhand` appearing in pip-audit as "not found on PyPI" is accepted. Reason: the package has not been published yet. Consequence: this finding does not block production readiness.
 
 ## Outcomes & Retrospective
 
-Not started.
+EP-010 completed successfully — **Human Hand is production-ready.**
+
+### Final Launch Gate Report
+
+| Gate | Status | Evidence |
+|------|--------|----------|
+| `sh scripts/verify.sh` | ✅ PASS | 774 passed, 2 skipped, 95.07% coverage |
+| `sh scripts/security-check.sh` | ✅ PASS | Bandit clean, secret scan clean |
+| `sh scripts/dependency-audit.sh` | ✅ PASS | No known vulnerabilities |
+| `sh scripts/smoke-test.sh` | ✅ PASS | 30 passed in 0.87s (target: <30s) |
+| `sh scripts/build.sh` | ✅ PASS | Wheel + sdist built |
+| `sh scripts/production-readiness-check.sh` | ✅ PASS | `production readiness: ok` |
+| `sh scripts/loop.sh` | ✅ PASS | `build: complete` |
+| Coverage threshold (≥85%) | ✅ PASS | 95.07% |
+| No user text in logs/cache | ✅ PASS | Verified by test suite |
+| No secrets in repo/artifacts | ✅ PASS | Bandit + secret scan |
+| Docs complete and consistent | ✅ PASS | 12/12 docs reviewed, 2 minor fixes |
+| CI workflow exists | ✅ PASS | Windows + Ubuntu matrix |
+| Release workflow exists | ✅ PASS | Manual dispatch, no auto-publish |
+| No auth system | ✅ PASS | Confirmed absent |
+| No telemetry | ✅ PASS | Confirmed absent |
+
+### Remaining Risks
+- **PyPI publish**: Requires explicit maintainer approval; not performed.
+- **License**: Undecided by maintainer; must be chosen before PyPI publication.
+- **Live LLM/detector E2E**: Gated behind `HUMANHAND_RUN_LIVE_E2E=1`; not exercised in this session.

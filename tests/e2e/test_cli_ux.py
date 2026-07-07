@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import tempfile
 from pathlib import Path
@@ -9,7 +10,35 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from humanhand.application.services import (
+    DiffFactsResult,
+    RewriteResult,
+    ScrubResult,
+    VerifyResult,
+)
 from humanhand.cli.app import app
+from humanhand.cli.output import (
+    _color,
+    _color_enabled,
+    bold,
+    dim,
+    green,
+    red,
+    render_diff_facts_result,
+    render_health,
+    render_rewrite_result,
+    render_scrub_result,
+    render_verify_result,
+    status,
+    yellow,
+)
+from humanhand.domain.types import (
+    FactAnchor,
+    FactDiffReport,
+    ScrubFinding,
+    ScrubReport,
+)
+from humanhand.infra.config import Config
 
 runner = CliRunner()
 
@@ -222,6 +251,36 @@ class TestNoColorEnvVar:
         assert result.exit_code == 0
         assert "health: ok" in result.stdout
 
+    def test_verify_json_and_no_color(self, output_file: str) -> None:
+        """Verify with both --json and --no-color works."""
+        result = runner.invoke(app, ["verify", output_file, "--json", "--no-color"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_health_json_and_no_color(self) -> None:
+        """Health with both --json and --no-color works."""
+        result = runner.invoke(app, ["health", "--json", "--no-color"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_diff_facts_json_and_no_color(self, source_file: str, output_file: str) -> None:
+        """Diff-facts with both --json and --no-color works."""
+        result = runner.invoke(
+            app, ["diff-facts", source_file, output_file, "--json", "--no-color"]
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_scrub_json_and_no_color(self, output_file: str) -> None:
+        """Scrub --audit with both --json and --no-color works."""
+        result = runner.invoke(app, ["scrub", output_file, "--audit", "--json", "--no-color"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
 
 # ── stdout/stderr separation ─────────────────────────────────────
 
@@ -346,3 +405,209 @@ class TestExactOutputFormat:
         assert result.exit_code == 0
         line = result.stdout.strip()
         assert line == "health: ok"
+
+
+# ── Color helper direct tests ─────────────────────────────────────
+
+
+class TestColorHelpers:
+    """Direct tests of color helper functions."""
+
+    def test_bold_with_no_color(self) -> None:
+        """bold() with no_color=True returns plain text."""
+        assert bold("hello", no_color=True) == "hello"
+
+    def test_red_with_no_color(self) -> None:
+        """red() with no_color=True returns plain text."""
+        assert red("error", no_color=True) == "error"
+
+    def test_green_with_no_color(self) -> None:
+        """green() with no_color=True returns plain text."""
+        assert green("ok", no_color=True) == "ok"
+
+    def test_yellow_with_no_color(self) -> None:
+        """yellow() with no_color=True returns plain text."""
+        assert yellow("warn", no_color=True) == "warn"
+
+    def test_dim_with_no_color(self) -> None:
+        """dim() with no_color=True returns plain text."""
+        assert dim("subtle", no_color=True) == "subtle"
+
+    def test_color_with_no_color(self) -> None:
+        """_color() with no_color_flag=True returns plain text."""
+        assert _color(31, "text", no_color=True) == "text"
+
+
+class TestColorEnabled:
+    """Direct tests of _color_enabled() helper."""
+
+    def test_no_color_flag_disables_color(self) -> None:
+        """_color_enabled(no_color_flag=True) returns False."""
+        assert _color_enabled(no_color_flag=True) is False
+
+    def test_no_color_env_disables_color(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """_color_enabled with NO_COLOR set returns False."""
+        monkeypatch.setenv("NO_COLOR", "1")
+        assert _color_enabled() is False
+
+    def test_no_color_env_empty_allows_color(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """_color_enabled with NO_COLOR empty and tty returns True."""
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setattr("humanhand.cli.output.sys.stdout.isatty", lambda: True)
+        monkeypatch.setattr("humanhand.cli.output.sys.platform", "linux")
+        assert _color_enabled() is True
+
+    def test_disabled_on_pipe(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """_color_enabled returns False when stdout is not a tty."""
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setattr("humanhand.cli.output.sys.stdout.isatty", lambda: False)
+        monkeypatch.setattr("humanhand.cli.output.sys.platform", "linux")
+        assert _color_enabled() is False
+
+
+class TestStatus:
+    """Direct tests of status() helper."""
+
+    def test_status_output(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """status() prints to stderr."""
+        status("test message")
+        captured = capsys.readouterr()
+        assert "test message" in captured.err
+        assert captured.out == ""
+
+
+# ── Text render function direct tests ─────────────────────────────
+
+
+class TestTextRenderFunctions:
+    """Direct tests of text-mode render functions with synthetic data."""
+
+    def test_render_verify_score_high(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_verify_result with high score shows score value."""
+        result = VerifyResult(provider="local", model="test", score=0.96, label="human")
+        render_verify_result(result, json_mode=False, no_color=True)
+        captured = capsys.readouterr()
+        assert "0.9600" in captured.out
+        assert "human" in captured.out
+
+    def test_render_verify_score_low(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_verify_result with low score renders label."""
+        result = VerifyResult(provider="local", model="test", score=0.12, label="human")
+        render_verify_result(result, json_mode=False, no_color=True)
+        captured = capsys.readouterr()
+        assert "0.1200" in captured.out
+
+    def test_render_verify_score_none(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_verify_result with None score shows N/A."""
+        result = VerifyResult(provider="local", model="test", score=None, label=None)
+        render_verify_result(result, json_mode=False, no_color=True)
+        captured = capsys.readouterr()
+        assert "N/A" in captured.out
+
+    def test_render_verify_label_ai(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_verify_result with 'ai' label renders correctly."""
+        result = VerifyResult(provider="local", model="test", score=0.85, label="ai")
+        render_verify_result(result, json_mode=False, no_color=True)
+        captured = capsys.readouterr()
+        assert "0.8500" in captured.out
+        assert "ai" in captured.out
+
+    def test_render_verify_label_uncertain(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_verify_result with 'uncertain' label renders correctly."""
+        result = VerifyResult(provider="local", model="test", score=0.50, label="uncertain")
+        render_verify_result(result, json_mode=False, no_color=True)
+        captured = capsys.readouterr()
+        assert "uncertain" in captured.out
+
+    def test_render_verify_cache_hit(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_verify_result with cache_hit shows cached indicator."""
+        result = VerifyResult(
+            provider="local",
+            model="test",
+            score=0.75,
+            label="ai",
+            cache_hit=True,
+        )
+        render_verify_result(result, json_mode=False, no_color=True)
+        captured = capsys.readouterr()
+        assert "cached" in captured.out
+
+    def test_render_diff_facts_with_drift(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_diff_facts_result shows drift warning when has_drift is True."""
+        anchor = FactAnchor(text="test", category="claim", position=0)
+        report = FactDiffReport(
+            omissions=(anchor,),
+            additions=(),
+            contradictions=(),
+            preservation_score=0.75,
+            total_source_anchors=5,
+            total_candidate_anchors=3,
+        )
+        result = DiffFactsResult(report=report, source_chars=100, candidate_chars=80)
+        render_diff_facts_result(result, json_mode=False, no_color=True)
+        captured = capsys.readouterr()
+        assert "drift" in captured.out.lower()
+
+    def test_render_diff_facts_no_drift(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_diff_facts_result without drift has no warning."""
+        report = FactDiffReport(
+            omissions=(),
+            additions=(),
+            contradictions=(),
+            preservation_score=0.98,
+            total_source_anchors=5,
+            total_candidate_anchors=5,
+        )
+        result = DiffFactsResult(report=report, source_chars=100, candidate_chars=100)
+        render_diff_facts_result(result, json_mode=False, no_color=True)
+        captured = capsys.readouterr()
+        assert "drift" not in captured.out.lower()
+
+    def test_render_scrub_audit_no_findings(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_scrub_result with no findings shows summary."""
+        report = ScrubReport(findings=())
+        result = ScrubResult(report=report, audit_only=True)
+        render_scrub_result(result, json_mode=False, no_color=True)
+        captured = capsys.readouterr()
+        assert "0 finding" in captured.out.lower()
+
+    def test_render_scrub_with_findings(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_scrub_result lists findings correctly."""
+        finding = ScrubFinding(
+            category="timestamp",
+            location="header",
+            description="Found timestamp",
+            removed=True,
+        )
+        report = ScrubReport(findings=(finding,), modifications=1)
+        result = ScrubResult(report=report, audit_only=False, output_path="/tmp/output.txt")
+        render_scrub_result(result, json_mode=False, no_color=True)
+        captured = capsys.readouterr()
+        assert "timestamp" in captured.out
+        assert "finding" in captured.out.lower()
+        assert "/tmp/output.txt" in captured.out
+
+    def test_render_health_text_mode(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_health in text mode prints ok."""
+        render_health(
+            Config(), json_mode=False, config_valid=True, config_error=None, no_color=True
+        )
+        captured = capsys.readouterr()
+        assert "health: ok" in captured.out
+
+    def test_render_rewrite_text_output(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_rewrite_result in text mode prints summary."""
+        result = RewriteResult(
+            output_path="/tmp/output.txt",
+            input_chars=100,
+            output_chars=80,
+            repair_attempts=1,
+            preservation_score=0.92,
+            duration_ms=500.0,
+        )
+        render_rewrite_result(result, json_mode=False, no_color=True)
+        captured = capsys.readouterr()
+        assert "output.txt" in captured.out
+        assert "100" in captured.out
+        assert "80" in captured.out
+        assert "repair" in captured.out.lower()

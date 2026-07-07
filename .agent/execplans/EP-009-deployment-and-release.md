@@ -4,7 +4,7 @@ title: Deployment and Release
 status: not_started
 owner: agent
 created: 2026-07-05
-updated: 2026-07-05
+updated: 2026-07-06
 ---
 
 # EP-009: Deployment and Release
@@ -146,20 +146,35 @@ Rebuilding artifacts is safe. Do not commit built artifacts unless release proce
 
 ## Progress
 
-- [ ] M1 — Verify package metadata and build config.
-- [ ] M2 — Add post-install smoke validation.
-- [ ] M3 — Add manual release workflow.
-- [ ] M4 — Update release and rollback docs.
-- [ ] M5 — Release readiness verification.
+- [x] M1 — Verify package metadata and build config.
+- [x] M2 — Add post-install smoke validation.
+- [x] M3 — Add manual release workflow.
+- [x] M4 — Update release and rollback docs.
+- [x] M5 — Release readiness verification.
 
 ## Surprises & Discoveries
 
-- None yet.
+- `pyproject.toml` was missing packaging metadata such as `classifiers`, `keywords`, and `urls`; license metadata remained unset because the maintainer has not chosen a license yet.
+- README "Current Status" and "Next" sections were stale (referenced EP-005/EP-006).
+- CHANGELOG.md had only a skeleton — no actual entries for EP-001 through EP-009.
+- `.github/workflows/release.yml` did not exist at all.
+- All four agents completed in parallel with zero merge conflicts.
+- Console script entry point `humanhand = "humanhand.cli.app:app"` was correctly wired since EP-001 but never explicitly verified in smoke tests.
+- Audit note: the new smoke layer initially exercised imported Typer commands only; `scripts/smoke-test.sh` now also runs `uv run humanhand` commands against synthetic fixtures so release smoke verifies the console path directly.
 
 ## Decision Log
 
 - 2026-07-05: Release workflow must be manual and artifact-only. Reason: input forbids auto PyPI publish. Consequence: publishing remains maintainer action outside agent automation.
+- 2026-07-06: Left project license unset. Reason: the maintainer explicitly said licensing is undecided. Consequence: packaging metadata and release docs avoid false license/open-source claims until that decision is made.
+- 2026-07-06: Smoke verification now runs `uv run humanhand` commands against synthetic fixtures before pytest smoke coverage. Reason: EP-009 needs console-script validation, not only imported `CliRunner` coverage. Consequence: local smoke is closer to post-install behavior while clean wheel install remains a documented manual release step.
+- 2026-07-06: Release workflow uses `workflow_dispatch` only with 7-day artifact retention. Reason: manual releases with short-lived artifacts; no auto-publish. Consequence: releases require a human to trigger and download artifacts.
+- 2026-07-06: Updated `.agent/state/continuation.md` during the Codex audit pass. Reason: the local Claude/Codex loop relies on a truthful continuation note between ExecPlans. Consequence: Claude can begin EP-010 from the audited release-prep state without re-deriving EP-009 outcomes.
 
 ## Outcomes & Retrospective
 
-Not started.
+EP-009 completed successfully. Summary:
+
+- **Added**: `pyproject.toml` packaging metadata (classifiers, keywords, urls), `.github/workflows/release.yml` (manual dispatch, matrix build, artifact upload), `tests/smoke/test_installed_wheel.py` (post-install CLI contract coverage), and direct `uv run humanhand` smoke commands in `scripts/smoke-test.sh`.
+- **Updated**: README.md (status section), CHANGELOG.md (EP-001 through EP-009 entries), RELEASE.md (criteria, checklist, smoke commands, no open-source assumption), ROLLBACK.md (paths, security verifications), DEPLOYMENT.md (flow steps, cache path).
+- **Confirmed**: Build produces valid wheel/sdist. 774 tests passing. Coverage 95.12%. No auto-publish configured and no license is asserted in package metadata.
+- **Validation**: `verify.sh` exits 0.

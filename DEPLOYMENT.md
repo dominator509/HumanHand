@@ -25,7 +25,7 @@ Human Hand has no hosted server deployment.
 
 ## Release Flow
 
-1. Complete EP-010.
+1. Complete EP-001 through EP-010.
 2. Confirm `sh scripts/verify.sh` exits 0.
 3. Confirm `sh scripts/production-readiness-check.sh` exits 0.
 4. Confirm `sh scripts/loop.sh` prints `build: complete`.
@@ -53,7 +53,7 @@ PyPI publishing is manual and requires explicit maintainer approval. No CI workf
 
 ## Migration Steps
 
-No primary database migrations. Optional cache schema is created lazily. Cache rollback is deletion of `.cache/humanhand/cache.db` or the configured cache file.
+No primary database migrations. Optional cache schema is created lazily. Cache rollback is deletion of `.cache/humanhand` or the configured cache file.
 
 ## Rollback Steps
 

@@ -178,3 +178,25 @@ class TestErrorMappingSmoke:
     def test_diff_facts_missing_file(self) -> None:
         result = runner.invoke(app, ["diff-facts", "/nonexistent/a.txt", "/nonexistent/b.txt"])
         assert result.exit_code != 0
+
+
+# ── Console script entry point ────────────────────────────────
+
+
+class TestConsoleScriptEntryPoint:
+    """Verify that pyproject.toml defines the console script entry point."""
+
+    def test_entry_point_in_pyproject_toml(self) -> None:
+        """humanhand = "humanhand.cli.app:app" must exist in pyproject.toml."""
+        import tomllib
+
+        with open("pyproject.toml", "rb") as f:
+            data = tomllib.load(f)
+
+        scripts = data.get("project", {}).get("scripts", {})
+        assert "humanhand" in scripts, (
+            'Missing [project.scripts] entry "humanhand" in pyproject.toml'
+        )
+        assert scripts["humanhand"] == "humanhand.cli.app:app", (
+            f'Expected "humanhand.cli.app:app", got "{scripts["humanhand"]}"'
+        )

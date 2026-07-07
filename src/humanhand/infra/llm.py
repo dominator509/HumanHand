@@ -121,6 +121,9 @@ class OpenAiLlmClient(LlmClient):
             except (KeyError, IndexError, TypeError) as exc:
                 raise LlmError(f"Unexpected LLM response structure: {exc}") from exc
 
+            if content is None or not isinstance(content, str):
+                raise LlmError("Unexpected LLM response structure: content is missing or invalid")
+
             return content
 
         # Guard -- the loop always returns or raises.

@@ -9,7 +9,27 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from humanhand.cli.app import app
+from humanhand.application.services import (
+    DiffFactsResult,
+    RewriteResult,
+    ScrubResult,
+    VerifyResult,
+)
+from humanhand.cli.app import EXIT_CONFIG_ERROR, EXIT_INPUT_ERROR, EXIT_IO_ERROR, app
+from humanhand.cli.output import (
+    render_diff_facts_result,
+    render_health,
+    render_rewrite_result,
+    render_scrub_result,
+    render_verify_result,
+)
+from humanhand.domain.types import (
+    FactAnchor,
+    FactDiffReport,
+    ScrubFinding,
+    ScrubReport,
+)
+from humanhand.infra.config import Config
 
 runner = CliRunner()
 
@@ -279,6 +299,65 @@ class TestJsonError:
         assert isinstance(data["message"], str)
         assert len(data["message"]) > 0
 
+    def test_json_error_directory_not_a_file(self, tmp_path: Path) -> None:
+        """JSON error for directory path has correct exit code."""
+        result = runner.invoke(app, ["verify", str(tmp_path), "--json"])
+        assert result.exit_code != 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+        assert "message" in data
+        assert data["exit_code"] == EXIT_IO_ERROR
+
+    def test_json_error_invalid_utf8(self, tmp_path: Path) -> None:
+        """JSON error for invalid UTF-8 produces valid error JSON."""
+        bad_file = tmp_path / "bad_utf8_json.txt"
+        bad_file.write_bytes(b"\xff\xfe\x00\x00")
+        result = runner.invoke(app, ["scrub", str(bad_file), "--audit", "--json"])
+        assert result.exit_code != 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+        assert "message" in data
+        assert data["exit_code"] > 0
+
+    def test_json_config_invalid_max_chars_zero(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """JSON error for invalid config has correct exit code."""
+        monkeypatch.setenv("HUMANHAND_MAX_CHARS", "0")
+        result = runner.invoke(app, ["verify", "dummy_cfg_json.txt", "--json"])
+        assert result.exit_code != 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+        assert "message" in data
+        assert data["exit_code"] == EXIT_CONFIG_ERROR
+
+    def test_json_rewrite_source_too_large(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """JSON error for source too large has correct exit code."""
+        monkeypatch.setenv("HUMANHAND_MAX_CHARS", "1")
+        source = tmp_path / "src_json_too_large.txt"
+        source.write_text("Longer source text")
+        style = tmp_path / "style_json_too_large.txt"
+        style.write_text("Short")
+        out = tmp_path / "out_json_too_large.txt"
+        result = runner.invoke(
+            app,
+            [
+                "rewrite",
+                "--source",
+                str(source),
+                "--style",
+                str(style),
+                "--out",
+                str(out),
+                "--json",
+            ],
+        )
+        assert result.exit_code != 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+        assert "message" in data
+        assert data["exit_code"] == EXIT_INPUT_ERROR
+
 
 # ── JSON output hygiene ─────────────────────────────────────────
 
@@ -327,3 +406,130 @@ class TestJsonHygiene:
         assert result.exit_code != 0
         data = json.loads(result.stdout)
         assert data["status"] == "error"
+
+
+# ── JSON render function direct tests ─────────────────────────────
+
+
+class TestJsonRenderFunctions:
+    """Direct tests of JSON render output functions with synthetic data."""
+
+    def test_render_health_json_default(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_health with JSON includes all keys."""
+        render_health(Config(), json_mode=True, config_valid=True, config_error=None, no_color=True)
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["status"] == "ok"
+        assert data["config_valid"] is True
+        assert data["config_error"] is None
+        assert "commands" in data
+        assert "version" in data
+
+    def test_render_health_json_config_error(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_health JSON includes config_error field."""
+        render_health(
+            Config(), json_mode=True, config_valid=False, config_error="ValueError", no_color=True
+        )
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["config_valid"] is False
+        assert data["config_error"] == "ValueError"
+
+    def test_render_verify_json_score_none(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_verify_result JSON with None score/label."""
+        result = VerifyResult(provider="local", model="test", score=None, label=None)
+        render_verify_result(result, json_mode=True, no_color=True)
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["score"] is None
+        assert data["label"] is None
+        assert data["provider"] == "local"
+
+    def test_render_verify_json_cache_hit(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_verify_result JSON with cache_hit."""
+        result = VerifyResult(
+            provider="local",
+            model="test",
+            score=0.85,
+            label="human",
+            cache_hit=True,
+            duration_ms=5.0,
+        )
+        render_verify_result(result, json_mode=True, no_color=True)
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["cache_hit"] is True
+        assert data["score"] == 0.85
+
+    def test_render_scrub_json_empty_findings(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_scrub_result JSON with no findings."""
+        report = ScrubReport(findings=())
+        result = ScrubResult(report=report, audit_only=True, output_path=None)
+        render_scrub_result(result, json_mode=True, no_color=True)
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["findings_count"] == 0
+        assert data["findings"] == []
+        assert data["audit_only"] is True
+
+    def test_render_scrub_json_removed_finding(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_scrub_result JSON includes removed flag."""
+        finding = ScrubFinding(
+            category="timestamp",
+            location="header",
+            description="Found timestamp",
+            removed=True,
+        )
+        report = ScrubReport(findings=(finding,), modifications=1)
+        result = ScrubResult(report=report, audit_only=False, output_path="/tmp/out.txt")
+        render_scrub_result(result, json_mode=True, no_color=True)
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["modifications"] == 1
+        assert len(data["findings"]) == 1
+        assert data["findings"][0]["removed"] is True
+        assert data["output_path"] is not None
+
+    def test_render_diff_facts_json_with_counts(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_diff_facts_result JSON includes count and drift fields."""
+        anchor = FactAnchor(text="fact", category="claim", position=0)
+        report = FactDiffReport(
+            omissions=(anchor,),
+            additions=(),
+            contradictions=(),
+            preservation_score=0.85,
+            total_source_anchors=3,
+            total_candidate_anchors=2,
+        )
+        result = DiffFactsResult(
+            report=report, source_chars=100, candidate_chars=80, duration_ms=10.0
+        )
+        render_diff_facts_result(result, json_mode=True, no_color=True)
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["preservation_score"] == 0.85
+        assert data["omissions"] == 1
+        assert data["additions"] == 0
+        assert data["contradictions"] == 0
+        assert data["has_drift"] is True
+
+    def test_render_rewrite_json_all_keys(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """render_rewrite_result JSON includes all expected keys."""
+        result = RewriteResult(
+            output_path="/tmp/output.txt",
+            input_chars=100,
+            output_chars=80,
+            repair_attempts=2,
+            preservation_score=0.95,
+            duration_ms=500.0,
+        )
+        render_rewrite_result(result, json_mode=True, no_color=True)
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["status"] == "ok"
+        assert data["output_path"] == "/tmp/output.txt"
+        assert data["input_chars"] == 100
+        assert data["output_chars"] == 80
+        assert data["repair_attempts"] == 2
+        assert data["preservation_score"] == 0.95
+        assert data["duration_ms"] == 500.0

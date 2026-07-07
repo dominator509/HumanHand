@@ -68,6 +68,56 @@ class TestBuildRewritePrompt:
         contract = build_rewrite_prompt(source, style, fp, facts)
         assert source in contract.user_message
 
+    def test_style_description_all_branches(self) -> None:
+        """Cover _describe_style: total_paragraphs, formality, common_phrases, punctuation."""
+        source = "Some source text."
+        style = "Some style sample."
+        fp = StyleFingerprint(
+            total_words=100,
+            avg_sentence_length=18.0,
+            sentence_length_variance=4.0,
+            avg_paragraph_length=3.5,
+            total_paragraphs=4,
+            formality_score=0.45,
+            common_phrases=("in other words", "for example"),
+            punctuation_ratios={
+                "comma": 0.03,
+                "semicolon": 0.005,
+                "dash": 0.002,
+                "question": 0.005,
+            },
+            vocabulary_richness=0.55,
+        )
+        facts: list[FactAnchor] = []
+
+        contract = build_rewrite_prompt(source, style, fp, facts)
+
+        # Line 116: total_paragraphs > 0
+        assert "Average paragraph length" in contract.user_message
+        # Line 121: formality_score in (0.3, 0.6] → neutral tone
+        assert "neutral and balanced" in contract.user_message
+        # Line 126-127: common_phrases non-empty
+        assert "Common phrases:" in contract.user_message
+        assert "in other words" in contract.user_message
+        # Punctuation (lines 131-139)
+        assert "frequent comma use" in contract.user_message
+        assert "semicolon use" in contract.user_message
+        assert "em-dash use" in contract.user_message
+        assert "rhetorical questions" in contract.user_message
+        assert "Punctuation style:" in contract.user_message
+
+    def test_style_description_formal_tone(self) -> None:
+        """Line 119: formality_score > 0.6 produces formal tone description."""
+        source = "Source text."
+        style = "Style text."
+        fp = StyleFingerprint(
+            total_words=50,
+            avg_sentence_length=22.0,
+            formality_score=0.85,
+        )
+        contract = build_rewrite_prompt(source, style, fp, [])
+        assert "formal and academic" in contract.user_message
+
 
 class TestBuildRepairPrompt:
     def test_basic_repair(self) -> None:

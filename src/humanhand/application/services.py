@@ -233,7 +233,13 @@ def verify(
     """
     t0 = time.monotonic()
 
-    logger.log("verify.start", level="info", provider=provider, model=model)
+    logger.log(
+        "verify.start",
+        level="info",
+        provider=provider,
+        model=model,
+        input_length=len(text),
+    )
 
     # Check cache if enabled
     if cache_enabled and cache is not None:

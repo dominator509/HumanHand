@@ -4,7 +4,7 @@ title: Observability and Operations
 status: not_started
 owner: agent
 created: 2026-07-05
-updated: 2026-07-05
+updated: 2026-07-07
 ---
 
 # EP-008: Observability and Operations
@@ -142,20 +142,38 @@ Logging integration can be rerun safely. If duplicate events appear, centralize 
 
 ## Progress
 
-- [ ] M1 — Implement structured logging fields.
-- [ ] M2 — Integrate redaction and no-text log tests.
-- [ ] M3 — Add local counters.
-- [ ] M4 — Complete health command and docs.
-- [ ] M5 — Observability full verification.
+- [x] M1 — Implement structured logging fields.
+- [x] M2 — Integrate redaction and no-text log tests.
+- [x] M3 — Add local counters.
+- [x] M4 — Complete health command and docs.
+- [x] M5 — Observability full verification.
 
 ## Surprises & Discoveries
 
-- None yet.
+- Much of EP-008 was already partially implemented by EP-006 (logging.py with JSONL, redaction, safe helpers) and the Codex audit (logger wired through CLI).
+- OPERATIONS.md and OBSERVABILITY.md were already complete from the blueprint phase; only minor clarifications needed.
+- Health command already existed but lacked `cache_dir_writable` and `endpoint_url_valid` fields required by OPERATIONS.md.
+- Local counters were entirely absent before EP-008 and created from scratch with a whitelist-validated `Counters` class.
+- The three ultracode agents collectively added 138 tests across counters, health e2e, logging fields, and observability integration.
+- The original EP-008 validation suite still passed even though `command.counters` events were not actually emitted by CLI command paths; the Codex audit exposed that gap and added runtime plus regression coverage for it.
+- Emitting counter events on every exit regressed the existing stderr error-tail contract, so the audit kept counter emission on successful command completions only.
 
 ## Decision Log
 
 - 2026-07-05: Observability is local-only. Reason: product forbids telemetry. Consequence: no dashboards/traces/exporters are implemented.
+- 2026-07-07: Counter names are validated against a whitelist of 9 allowed names from OBSERVABILITY.md. Reason: prevents accidental text leakage through unknown counter names. Consequence: unknown counter names raise ValueError.
+- 2026-07-07: Health command `cache_dir_writable` is None when cache is disabled. Reason: distinguishes "not writable" from "not applicable." Consequence: consumers must handle tri-state boolean.
+- 2026-07-07: Health command `endpoint_url_valid` uses syntactic URL parsing only. Reason: health must not make network calls. Consequence: only checks URL shape, not connectivity.
+- 2026-07-07: CLI emits `command.counters` only after successful command completion. Reason: preserves the existing stderr error-tail contract while still satisfying EP-008 counter emission for completed runs. Consequence: failed commands do not emit counter events.
+- 2026-07-07: `verify.start` logs `input_length` from the real file-read path. Reason: counter events should reflect the analyzed character count even on Windows newline normalization. Consequence: verify counter assertions and runtime telemetry stay aligned.
+- 2026-07-07: Updated `.agent/state/continuation.md` in addition to planned files. Reason: AGENTS.md defines it as the optional pause handoff note for the Claude/Codex loop. Consequence: the next Claude prompt can stay small and cache-stable without relying on chat history.
 
 ## Outcomes & Retrospective
 
-Not started.
+EP-008 completed successfully. Summary:
+
+- **Added**: `counters.py` (whitelist-validated counter collector), `test_counters.py` (28 tests), `test_logging.py` (33 tests), `test_observability.py` (39 tests), `test_health_command.py` (38 tests).
+- **Hardened**: Health command now reports `cache_dir_writable` and `endpoint_url_valid` per OPERATIONS.md.
+- **Audit fix**: CLI command paths now emit `command.counters` JSONL events on successful completion, and observability integration coverage now proves health, scrub, and verify cache hit/miss counter behavior.
+- **Confirmed**: JSONL logs parse, required fields present, no user text/secrets in logs/counters, health works offline, no telemetry imports exist.
+- **Validation**: `verify.sh` exits 0. 765 tests passing (2 skipped). Coverage 95.12% enforced against 85% threshold.

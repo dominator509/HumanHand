@@ -17,6 +17,12 @@ from humanhand.infra.detectors import (
     create_detector,
 )
 from humanhand.infra.detectors.base import DetectorError, DetectorResult, ProviderUnavailableError
+from humanhand.infra.detectors.local import (
+    _avg_word_length,
+    _classify,
+    _repeated_bigram_ratio,
+    _sentence_length_variance,
+)
 
 # ── Sample texts for local-detector heuristics ───────────────────
 
@@ -160,6 +166,43 @@ class TestLocalDetector:
         metrics = raw.get("metrics", {})
         assert metrics.get("ai_phrase_count", 0) > 0, "AI text should contain AI-typical phrases"
 
+    def test_uncertain_classification(self) -> None:
+        """Line 183: detect produces 'uncertain' label for moderately AI-like text."""
+        uncertain_text = (
+            "It is important to note the data trends. "
+            "However it is crucial to evaluate the results. "
+            "It is essential to consider the options carefully. "
+            "In conclusion the analysis shows significant findings."
+        )
+        detector = LocalDetector()
+        result = detector.detect(uncertain_text)
+        # Combined score should fall in uncertain range [0.35, 0.65)
+        assert 0.35 <= result["score"] < 0.65, (
+            f"Expected uncertain score in [0.35, 0.65), got {result['score']}"
+        )
+        assert result["label"] == "uncertain", (
+            f"Expected label 'uncertain', got '{result['label']}'"
+        )
+
+    def test_short_avg_word_length(self) -> None:
+        """Line 154: Very short average word length produces word_len_score of 1.0."""
+        detector = LocalDetector()
+        result = detector.detect("A big dog ran. I am a cat.")
+        scores = result["raw_score_json"]["scores"]
+        assert scores["word_len_score"] == 1.0
+
+    def test_detect_raises_on_unexpected_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Lines 275-276: Unexpected errors inside detect are wrapped in DetectorError."""
+
+        def broken_tokenize(text: str) -> list[str]:
+            raise RuntimeError("Unexpected internal failure")
+
+        monkeypatch.setattr("humanhand.infra.detectors.local._tokenize", broken_tokenize)
+
+        detector = LocalDetector()
+        with pytest.raises(DetectorError, match="Local detector analysis failed"):
+            detector.detect("Some text here.")
+
 
 class TestLocalDetectorEdgeCases:
     """Edge cases for the local heuristic detector."""
@@ -223,6 +266,26 @@ class TestLocalDetectorEdgeCases:
         result = detector.detect(text)
         assert result["score"] is not None
         assert 0.0 <= result["score"] <= 1.0
+
+    def test_repeated_bigram_ratio_short(self) -> None:
+        """Line 84: _repeated_bigram_ratio returns 0.0 for fewer than 3 words."""
+        assert _repeated_bigram_ratio([]) == 0.0
+        assert _repeated_bigram_ratio(["a"]) == 0.0
+        assert _repeated_bigram_ratio(["a", "b"]) == 0.0
+
+    def test_sentence_length_variance_single(self) -> None:
+        """Line 100: _sentence_length_variance returns 0.0 for fewer than 2 sentences."""
+        assert _sentence_length_variance(["Only one sentence here."]) == 0.0
+
+    def test_avg_word_length_empty(self) -> None:
+        """Line 119: _avg_word_length returns 0.0 for empty word list."""
+        assert _avg_word_length([]) == 0.0
+
+    def test_classify_uncertain(self) -> None:
+        """Line 183: _classify returns 'uncertain' for scores in [0.35, 0.65)."""
+        assert _classify(0.35) == "uncertain"
+        assert _classify(0.5) == "uncertain"
+        assert _classify(0.64) == "uncertain"
 
 
 class TestDetectorResult:

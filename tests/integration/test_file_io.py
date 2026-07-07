@@ -102,6 +102,19 @@ class TestReadTextStrict:
         finally:
             Path(path).unlink()
 
+    def test_os_error_reading_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Lines 37-38: OSError in read_text_strict is wrapped as FileIOError."""
+        p = tmp_path / "locked.txt"
+        p.write_text("content", encoding="utf-8")
+
+        def mock_read_bytes(self_obj: Path) -> bytes:
+            raise OSError("Permission denied")
+
+        monkeypatch.setattr(Path, "read_bytes", mock_read_bytes)
+
+        with pytest.raises(FileIOError, match="Cannot read file"):
+            read_text_strict(p)
+
 
 class TestReadTextStrictOrStdin:
     def test_stdin_sentinel(self) -> None:
@@ -176,6 +189,44 @@ class TestWriteCleanText:
         raw = out_path.read_bytes()
         assert not raw.startswith(b"\xef\xbb\xbf")
 
+    def test_input_paths_no_overlap(self, tmp_path: Path) -> None:
+        """Line 102: write_clean_text with input_paths that don't overlap with output."""
+        out_path = tmp_path / "output.txt"
+        inp_path = tmp_path / "input.txt"
+        inp_path.write_text("input", encoding="utf-8")
+
+        result = write_clean_text(out_path, "clean output", input_paths=[inp_path])
+        assert result == out_path.resolve()
+        assert out_path.exists()
+        written = out_path.read_text("utf-8")
+        assert "clean output" in written
+
+    def test_write_parent_dir_creation_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Lines 114-115: OSError creating parent directory is wrapped as FileIOError."""
+        out_path = tmp_path / "sub" / "output.txt"
+
+        def mock_mkdir(self_obj: Path, *args: object, **kwargs: object) -> None:
+            raise OSError("Permission denied")
+
+        monkeypatch.setattr(Path, "mkdir", mock_mkdir)
+
+        with pytest.raises(FileIOError, match="Cannot create output directory"):
+            write_clean_text(out_path, "content")
+
+    def test_write_bytes_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Lines 121-122: OSError writing bytes is wrapped as FileIOError."""
+        out_path = tmp_path / "output.txt"
+
+        def mock_write_bytes(self_obj: Path, data: bytes) -> None:
+            raise OSError("Permission denied")
+
+        monkeypatch.setattr(Path, "write_bytes", mock_write_bytes)
+
+        with pytest.raises(FileIOError, match="Cannot write output file"):
+            write_clean_text(out_path, "content")
+
 
 class TestReadBytes:
     def test_read_bytes(self, tmp_path: Path) -> None:
@@ -187,3 +238,16 @@ class TestReadBytes:
     def test_read_bytes_not_found(self) -> None:
         with pytest.raises(FileIOError, match="File not found"):
             read_bytes("nonexistent_binary_file.xyz")
+
+    def test_read_bytes_os_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Lines 144-145: OSError in read_bytes is wrapped as FileIOError."""
+        p = tmp_path / "data.bin"
+        p.write_bytes(b"\x00\x01\x02")
+
+        def mock_read_bytes(self_obj: Path) -> bytes:
+            raise OSError("Permission denied")
+
+        monkeypatch.setattr(Path, "read_bytes", mock_read_bytes)
+
+        with pytest.raises(FileIOError, match="Cannot read file"):
+            read_bytes(p)

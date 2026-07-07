@@ -92,6 +92,8 @@ def render_health(
     config_valid: bool = True,
     config_error: str | None = None,
     no_color: bool = False,
+    cache_dir_writable: bool | None = None,
+    endpoint_url_valid: bool | None = None,
 ) -> None:
     """Render health check result to stdout."""
     if json_mode:
@@ -104,6 +106,8 @@ def render_health(
             "detector_provider": config.detector_provider,
             "cache_enabled": config.cache_enabled,
             "cache_dir": str(config.cache_dir),
+            "cache_dir_writable": cache_dir_writable,
+            "endpoint_url_valid": endpoint_url_valid,
             "config_valid": config_valid,
             "config_error": config_error,
             "commands": {

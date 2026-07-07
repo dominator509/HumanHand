@@ -1,0 +1,55 @@
+# Release workflow for Human Hand
+#
+# This workflow builds and verifies release artifacts.
+# Publishing (PyPI, GitHub Releases, git tags) is NOT performed here.
+# Publishing is manual and requires explicit maintainer approval per
+# DEPLOYMENT.md and RELEASE.md.
+#
+# Manual trigger only — no automatic triggers (push, schedule, etc.).
+
+name: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: sh scripts/install.sh
+        shell: bash
+
+      - name: Verify
+        run: sh scripts/verify.sh
+        shell: bash
+
+      - name: Build wheel and sdist
+        run: sh scripts/build.sh
+        shell: bash
+
+      # Upload dist artifacts for manual publishing.
+      # PyPI publish is NOT part of this workflow — it requires explicit
+      # maintainer approval and manual execution per RELEASE.md and
+      # DEPLOYMENT.md.
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: humanhand-dist-${{ matrix.os }}
+          path: dist/
+          retention-days: 7

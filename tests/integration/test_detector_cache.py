@@ -260,3 +260,161 @@ class TestDetectorScoreCache:
             assert mode == 0o600
         finally:
             cache.close()
+
+    def test_forbidden_column_in_schema_detected(self, tmp_path: Path) -> None:
+        """Line 75: _validate_no_text_columns raises CacheError when a forbidden column exists."""
+        db_path = tmp_path / "cache.db"
+        cache = DetectorScoreCache(db_path)
+        try:
+            _ = cache.conn  # Create schema
+            cache.conn.execute("ALTER TABLE detector_scores ADD COLUMN source_text TEXT")
+            cache.conn.commit()
+            cache.close()
+
+            cache2 = DetectorScoreCache(db_path)
+            with pytest.raises(CacheError, match="forbidden text columns"):
+                _ = cache2.conn
+        finally:
+            cache.close()
+
+    def test_raw_score_json_list_with_forbidden_field(self, tmp_path: Path) -> None:
+        """Lines 97-99: List in raw_score_json containing dict with forbidden field name."""
+        db_path = tmp_path / "cache.db"
+        cache = DetectorScoreCache(db_path)
+        try:
+            with pytest.raises(CacheError, match="forbidden field name"):
+                cache.put(
+                    {
+                        "text_sha256": "hash_list_bad",
+                        "provider": "test",
+                        "model": "v1",
+                        "score": 0.5,
+                        "raw_score_json": [{"text": "hello"}],
+                    }
+                )
+        finally:
+            cache.close()
+
+    def test_raw_score_json_unsupported_type(self, tmp_path: Path) -> None:
+        """Line 109: Unsupported value type in raw_score_json raises CacheError."""
+        db_path = tmp_path / "cache.db"
+        cache = DetectorScoreCache(db_path)
+        try:
+            with pytest.raises(CacheError, match="unsupported value type"):
+                cache.put(
+                    {
+                        "text_sha256": "hash_bad_type",
+                        "provider": "test",
+                        "model": "v1",
+                        "score": 0.5,
+                        "raw_score_json": {"nested": set()},
+                    }
+                )
+        finally:
+            cache.close()
+
+    def test_raw_score_json_invalid_json_string(self, tmp_path: Path) -> None:
+        """Lines 121-122: Invalid JSON string for raw_score_json raises CacheError."""
+        db_path = tmp_path / "cache.db"
+        cache = DetectorScoreCache(db_path)
+        try:
+            with pytest.raises(CacheError, match="raw_score_json must be valid JSON"):
+                cache.put(
+                    {
+                        "text_sha256": "hash_bad_json",
+                        "provider": "test",
+                        "model": "v1",
+                        "score": 0.5,
+                        "raw_score_json": "{invalid json}",
+                    }
+                )
+        finally:
+            cache.close()
+
+    def test_cache_write_error_closed_connection(self, tmp_path: Path) -> None:
+        """Line 241: sqlite3.Error during put() is wrapped as CacheError."""
+        db_path = tmp_path / "cache.db"
+        cache = DetectorScoreCache(db_path)
+        try:
+            _ = cache.conn
+            cache.conn.close()  # Close underlying connection but keep the reference
+            with pytest.raises(CacheError, match="Cache write error"):
+                cache.put(
+                    {
+                        "text_sha256": "hash_write_err",
+                        "provider": "test",
+                        "model": "v1",
+                        "score": 0.5,
+                    }
+                )
+        finally:
+            cache.close()
+
+    def test_cache_read_error_closed_connection(self, tmp_path: Path) -> None:
+        """Lines 208-209: sqlite3.Error during get() is wrapped as CacheError."""
+        db_path = tmp_path / "cache.db"
+        cache = DetectorScoreCache(db_path)
+        try:
+            _ = cache.conn
+            cache.conn.close()  # Close underlying connection but keep the reference
+            with pytest.raises(CacheError, match="Cache read error"):
+                cache.get("some_hash", "test", "v1")
+        finally:
+            cache.close()
+
+    def test_put_missing_required_field(self, tmp_path: Path) -> None:
+        """Line 239: Missing required field in put() raises CacheError."""
+        db_path = tmp_path / "cache.db"
+        cache = DetectorScoreCache(db_path)
+        try:
+            with pytest.raises(CacheError, match="required field"):
+                cache.put(
+                    {
+                        "provider": "test",
+                        "model": "v1",
+                        "score": 0.5,
+                        # Missing text_sha256
+                    }
+                )
+        finally:
+            cache.close()
+
+    def test_raw_score_json_valid_list(self, tmp_path: Path) -> None:
+        """Line 99: List in raw_score_json with all-valid items is accepted."""
+        db_path = tmp_path / "cache.db"
+        cache = DetectorScoreCache(db_path)
+        try:
+            cache.put(
+                {
+                    "text_sha256": "hash_valid_list",
+                    "provider": "test",
+                    "model": "v1",
+                    "score": 0.5,
+                    "raw_score_json": {"categories": ["cat_a", "cat_b"]},
+                }
+            )
+            result = cache.get("hash_valid_list", "test", "v1")
+            assert result is not None
+            assert "cat_a" in result["raw_score_json"]
+        finally:
+            cache.close()
+
+    def test_close_sqlite_error(self, tmp_path: Path) -> None:
+        """Lines 248-249: sqlite3.Error during close is handled gracefully."""
+        import sqlite3
+
+        db_path = tmp_path / "cache.db"
+        cache = DetectorScoreCache(db_path)
+        _ = cache.conn  # Initialize
+
+        class _FailingConn:
+            """Wrapper that raises on close to test defensive error handling."""
+
+            def close(self) -> None:
+                raise sqlite3.Error("mock close error")
+
+        cache._conn = _FailingConn()  # type: ignore[assignment]
+
+        # Must not raise despite close failing
+        cache.close()
+        assert cache._conn is None

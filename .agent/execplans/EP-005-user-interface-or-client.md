@@ -152,6 +152,9 @@ If CLI helpers already exist, extend them rather than duplicate renderers. Prefe
 - Typer's CliRunner uses a non-TTY stdout, so ANSI color codes are naturally suppressed in tests even without `--no-color`. Color tests validate structural acceptance (flag/env var accepted) rather than ANSI presence/absence in CliRunner output.
 - The `NO_COLOR` env var is checked by the output renderers but must also be checkable at the CLI level. Added to `_color_enabled()` in output.py which is called by all color helper functions.
 - Smoke test count went from 16 to 21 — all well within the 30-second target (2.54s).
+- The first EP-005 completion added `src/humanhand/cli/errors.py`, but the CLI still bypassed that catalog on most exception paths and printed raw exception strings instead. That left error wording less stable than the plan claimed and could leak absolute file paths in user-facing errors.
+- The first EP-005 completion also did not enforce the `output path unsafe` error state for CLI write paths. `rewrite` and `scrub` needed explicit `--out` versus input-path guards plus write-side `FileIOError` mapping to keep the CLI contract aligned with SPEC-004/SPEC-006.
+- README drifted behind the actual control plane: it omitted EP-004 from the completed status list and incorrectly said the next implementation seam was EP-004 instead of EP-006.
 
 ## Decision Log
 
@@ -159,13 +162,16 @@ If CLI helpers already exist, extend them rather than duplicate renderers. Prefe
 - 2026-07-06: Default color to off on Windows unless ANSI-capable terminal detected. Reason: Windows console host does not support ANSI by default. Consequence: color is conservative by default; users with Windows Terminal or ConEmu may need to set `TERM=xterm-256color` to get color output.
 - 2026-07-06: Created `cli/errors.py` as a centralized error message catalog. Reason: consistent, screen-reader-friendly, one-line error messages across all commands. Consequence: adding new error states requires updating the catalog; tests can reference catalog keys.
 - 2026-07-06: Fan-out strategy for EP-005: core code changes (M1-M3) done inline, E2E tests and docs/smoke done in parallel subagents. Reason: maximized parallelism for the iterative test-writing and doc-update phases while keeping tight control on the small core changes.
+- 2026-07-06: Codex audit routed CLI exception handling through the centralized error catalog instead of printing raw exception strings. Reason: EP-005 promised stable one-line errors and no raw system paths in user-facing output. Consequence: text and JSON error messages now stay sanitized and deterministic across read/config/provider/write failures.
+- 2026-07-06: Codex audit added CLI-level `--out` versus input-path guards for `rewrite` and `scrub`, and mapped write-side `FileIOError` paths back into stable I/O errors. Reason: `output path unsafe` is an explicit EP-005 error state and previously could slip through on write paths. Consequence: the CLI now rejects self-overwrite attempts before file writes occur.
+- 2026-07-06: `.agent/state/continuation.md` was updated during the audit even though it is not listed in Files to Change. Reason: the user requested the standard Claude-to-Codex handoff loop, which requires refreshed pause/resume state between ExecPlans. Consequence: the next EP-006 handoff starts from an audited state file, not a chat recap.
 
 ## Outcomes & Retrospective
 
-EP-005 is complete with all 5 milestones validated. Key outcomes:
+EP-005 is complete with all 5 milestones validated and the Codex audit pass applied. Key outcomes:
 
 - **Color/accessibility**: `--no-color` flag and `NO_COLOR` env var honored across all commands. Color helpers (`bold`, `red`, `green`, `yellow`, `dim`) available for all renderers. Windows-conservative default (color off unless ANSI terminal detected).
 - **JSON mode**: All 5 commands produce valid JSON with stable schemas in `--json` mode. JSON error shape is `{"status": "error", "message": "...", "exit_code": N}`. No extra text on stdout in JSON mode.
-- **Error polish**: Centralized error catalog with 25 message keys. All common failure modes (empty input, missing file, BOM, unknown provider, config error) produce clear one-line messages. No stack traces or system paths in error output.
-- **Documentation**: README.md updated with Quick Start, full command reference, output modes documentation, and JSON examples.
-- **Test coverage**: 121 unit, 91 integration, 137 E2E, and 21 smoke tests all pass. `verify.sh` exits 0.
+- **Error polish**: Centralized error catalog is now actually used by CLI exception paths. All common failure modes (empty input, missing file, BOM, unknown provider, config error, unsafe output path) produce clear one-line messages. Absolute file paths are no longer echoed back in user-facing text/JSON errors.
+- **Documentation**: README.md now reflects EP-004 and EP-005 as complete, points the next seam at EP-006, and uses sanitized error examples that match the CLI’s real behavior.
+- **Test coverage**: 121 unit, 92 integration, 141 E2E, and 21 smoke tests all pass. `verify.sh` exits 0.

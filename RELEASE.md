@@ -27,7 +27,7 @@ Maintain `CHANGELOG.md` after EP-009. Each release entry must include:
 
 ## Branch Strategy
 
-Branch strategy is lightweight for an open-source CLI:
+Branch strategy is lightweight for a standalone CLI:
 
 - `main` contains releasable work after verification.
 - Feature branches or agent sessions implement one ExecPlan.
@@ -36,6 +36,7 @@ Branch strategy is lightweight for an open-source CLI:
 
 ## Release Candidate Criteria
 
+- EP-001 through EP-009 complete (current baseline).
 - Active ExecPlan complete.
 - `sh scripts/verify.sh` passes.
 - `sh scripts/production-readiness-check.sh` passes for production candidates.
@@ -49,13 +50,13 @@ Branch strategy is lightweight for an open-source CLI:
 - [ ] Confirm active ExecPlan is complete.
 - [ ] Run `sh scripts/verify.sh`.
 - [ ] Run `sh scripts/production-readiness-check.sh` for production release.
+- [ ] Run `sh scripts/loop.sh` confirms `build: complete`.
 - [ ] Run `sh scripts/build.sh`.
 - [ ] Install wheel in clean Python 3.11 environment.
 - [ ] Run post-install smoke tests.
 - [ ] Review `git diff --name-only`.
 - [ ] Review artifacts for `.env`, `.cache`, secrets, and user text.
-- [ ] Update `CHANGELOG.md`.
-- [ ] Prepare release notes.
+- [ ] Prepare release notes and update `CHANGELOG.md`.
 - [ ] Obtain explicit maintainer approval for tag/publish.
 - [ ] Publish manually if approved.
 
@@ -66,10 +67,10 @@ Post-release smoke tests:
 - `humanhand --version`.
 - `humanhand --help`.
 - `humanhand health --json`.
-- `humanhand scrub --audit` on synthetic fixture.
-- `humanhand diff-facts` on synthetic fixture.
-- `humanhand verify` with local heuristic fallback.
-- Mocked/local rewrite path.
+- `humanhand rewrite --source <synthetic-file> --style <synthetic-file> --out <output-file>` (mocked/local endpoint).
+- `humanhand verify <output-file>` with local heuristic fallback.
+- `humanhand diff-facts <synthetic-source> <synthetic-output>`.
+- `humanhand scrub --audit <synthetic-file>`.
 
 ## Approvals
 

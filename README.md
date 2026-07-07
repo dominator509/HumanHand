@@ -1,10 +1,8 @@
 # Human Hand
 
-Human Hand is a Windows-first, privacy-preserving Python 3.11 CLI for rewriting AI-assisted source text into a supplied human writing style while preserving facts, stripping metadata, and supporting verification workflows.
+Human Hand v1.0 is a Windows-first, privacy-preserving Python 3.11 CLI for rewriting AI-assisted source text into a supplied human writing style while preserving facts, stripping metadata, and supporting verification workflows.
 
-AI generated drafts, rewritten into fully human writing without meta provenance leakage.
-
-The repository is being built one ExecPlan at a time from the control plane in `.agent/`. EP-001 foundation, EP-002 core domain, EP-003 data/persistence, and EP-005 CLI UX polish are complete: the package installs, the CLI works with 5 commands, and all baseline validations pass.
+All ExecPlans EP-000 through EP-010 are complete. The package installs, the CLI works with 5 commands, and all baseline validations pass (774 tests, 95% coverage).
 
 ## Goals
 
@@ -16,12 +14,12 @@ The repository is being built one ExecPlan at a time from the control plane in `
 
 ## Current Status
 
-- EP-001 foundation, EP-002 core domain, EP-003 data/persistence, and EP-005 CLI UX polish are complete.
+- All ExecPlans EP-000 through EP-010 are complete. Human Hand v1.0 is production-ready.
 - Five CLI commands are functional: `health`, `rewrite`, `verify`, `diff-facts`, and `scrub`.
-- Every command supports `--json` for machine-readable output and `--no-color` for ANSI-free output (also controllable via `NO_COLOR` environment variable). Color is off by default on Windows.
-- The `rewrite` command supports `--print` for printing generated prose to stdout; without it, stdout never contains generated text.
-- `humanhand.domain` plus the persistence layer provide style fingerprints, fact diffing, metadata scrub, strict file I/O, cache configuration, and SQLite detector-score caching with no-text safeguards.
-- Next: EP-004 API or service layer.
+- Every command supports `--json` for machine-readable output and `--no-color` for ANSI-free output.
+- The `rewrite` command supports `--print` for printing generated prose to stdout.
+- 774 tests, 95% coverage, CI matrix (Windows + Ubuntu), manual release workflow.
+- MIT licensed. Built with Python 3.11, Typer, httpx, and Pydantic.
 
 ## Quick Start
 
@@ -148,7 +146,7 @@ humanhand diff-facts draft.txt output.txt --json | jq '.preservation_score, .has
 Errors in JSON mode are also structured:
 
 ```json
-{"status": "error", "message": "File not found: /nonexistent", "exit_code": 3}
+{"status": "error", "message": "File not found", "exit_code": 3}
 ```
 
 ### Color Control

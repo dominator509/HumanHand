@@ -22,14 +22,14 @@ Maintainer decides release rollback, PyPI yanking, or superseding release. Codin
 |---|---|
 | Application rollback | Reinstall previous wheel version. |
 | Config rollback | Restore previous env/config values. |
-| Cache rollback | Delete `.cache/humanhand/cache.db` or configured cache file. |
+| Cache rollback | Delete `.cache/humanhand` or configured cache file. |
 | Release rollback | Yank/supersede release after maintainer decision. |
 | Documentation rollback | Correct docs and release notes. |
 
 ## Application Rollback
 
 1. Identify previous known-good version.
-2. Install previous wheel with pip.
+2. Install previous wheel with pip: `pip install dist/humanhand-*.whl` or point to the specific known-good version path.
 3. Run `humanhand --version`.
 4. Run post-install smoke tests.
 5. Document the reason and result.
@@ -53,6 +53,8 @@ No feature flag system exists. If a future feature flag is added, document it in
 - `humanhand health --json` works without exposing secrets.
 - Synthetic `verify`, `diff-facts`, and `scrub --audit` work.
 - Logs contain no user text or secrets.
+- `pip-audit` passes or findings are documented and accepted.
+- Bandit passes or findings are documented and accepted.
 
 ## Communication
 
