@@ -38,7 +38,7 @@ An ExecPlan is not complete until required validation commands pass. Do not rely
 
 ## Diff Review Rule
 
-Before final response, run `git diff --name-only`, compare with Files to Change, and justify extra changed files in the Decision Log.
+Before final response, run `git diff --name-only` and `git status --short --branch`, compare tracked and untracked changes with Files to Change, and justify extra changed files in the Decision Log.
 
 ## Final Response Rule
 

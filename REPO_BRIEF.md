@@ -35,7 +35,7 @@ Human Hand is a Windows-first Python 3.11 CLI built one ExecPlan at a time from 
 - External repo commands:
   - `rtk sh scripts/preflight.sh`
   - `rtk sh scripts/verify.sh`
-  - `rtk uv run humanhand --help`
+  - `rtk sh scripts/cli.sh --help`
   - `rtk git diff --name-only`
 - Windows builtins:
   - `rtk proxy cmd /c type AGENTS.md`

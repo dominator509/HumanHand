@@ -9,7 +9,6 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NoReturn
-from urllib.parse import urlparse
 
 import typer
 
@@ -21,7 +20,7 @@ from humanhand.application.services import (
     scrub_service,
     verify,
 )
-from humanhand.cli.errors import message_for_exception
+from humanhand.cli.errors import error_for_exception, get_error_message, message_for_exception
 from humanhand.cli.output import (
     render_diff_facts_result,
     render_health,
@@ -35,6 +34,7 @@ from humanhand.infra.counters import Counters, emit_counters
 from humanhand.infra.detectors import create_detector
 from humanhand.infra.detectors.base import DetectorError, ProviderUnavailableError
 from humanhand.infra.files import FileIOError, read_text_strict
+from humanhand.infra.http import HttpError, validate_endpoint
 from humanhand.infra.llm import LlmError, OpenAiLlmClient
 from humanhand.infra.logging import redact_value
 
@@ -208,6 +208,24 @@ def _output_matches_input(output_path: str, *input_paths: str) -> bool:
     return False
 
 
+def _validate_existing_file_path(path: str) -> None:
+    """Validate path existence/type without reading file contents."""
+    candidate = Path(path)
+    if not candidate.exists():
+        raise FileIOError(f"File not found: {candidate}")
+    if not candidate.is_file():
+        raise FileIOError(f"Not a regular file: {candidate}")
+
+
+def _effective_flag(ctx: typer.Context | None, local_value: bool, key: str) -> bool:
+    """Resolve a command flag from local options plus root-level callback state."""
+    if local_value:
+        return True
+    if ctx is None or not isinstance(ctx.obj, dict):
+        return False
+    return bool(ctx.obj.get(key, False))
+
+
 # ── Callback ────────────────────────────────────────────────────
 
 
@@ -219,6 +237,7 @@ def version_callback(value: bool) -> None:
 
 @app.callback()
 def main(
+    ctx: typer.Context,
     version: bool = typer.Option(
         False,
         "--version",
@@ -239,6 +258,12 @@ def main(
     ),
 ) -> None:
     """Human Hand CLI — rewrite AI-assisted text into human style."""
+    inherited_flags = ctx.obj if isinstance(ctx.obj, dict) else {}
+    ctx.obj = {
+        **inherited_flags,
+        "json_mode": json_mode,
+        "no_color": no_color,
+    }
 
 
 # ── Commands ────────────────────────────────────────────────────
@@ -246,6 +271,7 @@ def main(
 
 @app.command(name="health")
 def health_cmd(
+    ctx: typer.Context,
     json_mode: bool = typer.Option(
         False,
         "--json",
@@ -258,6 +284,8 @@ def health_cmd(
     ),
 ) -> None:
     """Check CLI health without network calls or user text."""
+    json_mode = _effective_flag(ctx, json_mode, "json_mode")
+    no_color = _effective_flag(ctx, no_color, "no_color")
     counters = Counters()
     logger = _CliLogger(counters)
     started_at = time.monotonic()
@@ -287,13 +315,14 @@ def health_cmd(
             except (OSError, PermissionError):
                 cache_dir_writable = False
 
-        # Check endpoint URL syntactic validity (no network call)
+        # Check endpoint URL validity under the same local safety rules
+        # enforced by the LLM client, but without making a network call.
         endpoint_url_valid: bool | None = None
         if config.llm_base_url:
             try:
-                parsed = urlparse(config.llm_base_url)
-                endpoint_url_valid = bool(parsed.scheme and parsed.netloc)
-            except Exception:
+                validate_endpoint(config.llm_base_url, config.allow_insecure)
+                endpoint_url_valid = True
+            except HttpError:
                 endpoint_url_valid = False
 
         render_health(
@@ -320,6 +349,7 @@ def health_cmd(
 
 @app.command(name="rewrite")
 def rewrite_cmd(
+    ctx: typer.Context,
     source: str = typer.Option(
         ...,
         "--source",
@@ -343,7 +373,7 @@ def rewrite_cmd(
     print_output: bool = typer.Option(
         False,
         "--print",
-        help="Print generated prose to stdout.",
+        help="Print generated prose to stdout (text mode only).",
     ),
     no_color: bool = typer.Option(
         False,
@@ -352,16 +382,66 @@ def rewrite_cmd(
     ),
 ) -> None:
     """Rewrite AI-assisted text to match a human writing style."""
+    json_mode = _effective_flag(ctx, json_mode, "json_mode")
+    no_color = _effective_flag(ctx, no_color, "no_color")
     counters = Counters()
     logger = _CliLogger(counters)
     completed = False
     try:
+        if json_mode and print_output:
+            _report_error(
+                "--print cannot be combined with --json",
+                EXIT_INPUT_ERROR,
+                json_mode,
+                logger=logger,
+                event="rewrite.error",
+            )
+
         try:
             config = load_config()
         except Exception as exc:
             _report_error(
                 message_for_exception(exc),
                 EXIT_CONFIG_ERROR,
+                json_mode,
+                logger=logger,
+                event="rewrite.error",
+            )
+
+        # Validate cheap path-only errors before live config so they do not
+        # get masked by missing endpoint/model configuration.
+        try:
+            if source != "-":
+                _validate_existing_file_path(source)
+            _validate_existing_file_path(style)
+        except FileIOError as exc:
+            _report_error(
+                message_for_exception(exc),
+                EXIT_IO_ERROR,
+                json_mode,
+                logger=logger,
+                event="rewrite.error",
+            )
+
+        if _output_matches_input(out, source, style):
+            _report_error(
+                message_for_exception(FileIOError("Output path must not match an input path")),
+                EXIT_IO_ERROR,
+                json_mode,
+                logger=logger,
+                event="rewrite.error",
+            )
+
+        # Fail fast on LLM configuration before reading user text.
+        try:
+            llm_client = OpenAiLlmClient(config)
+        except LlmError as exc:
+            error_key = error_for_exception(exc)
+            _report_error(
+                get_error_message(error_key),
+                EXIT_CONFIG_ERROR
+                if error_key in {"missing_llm_url", "missing_llm_model"}
+                else EXIT_EXTERNAL_ERROR,
                 json_mode,
                 logger=logger,
                 event="rewrite.error",
@@ -382,35 +462,6 @@ def rewrite_cmd(
         # Read style file
         try:
             style_text = read_text_strict(style)
-        except FileIOError as exc:
-            _report_error(
-                message_for_exception(exc),
-                EXIT_IO_ERROR,
-                json_mode,
-                logger=logger,
-                event="rewrite.error",
-            )
-
-        if _output_matches_input(out, source, style):
-            _report_error(
-                message_for_exception(FileIOError("Output path must not match an input path")),
-                EXIT_IO_ERROR,
-                json_mode,
-                logger=logger,
-                event="rewrite.error",
-            )
-
-        # Create LLM client
-        try:
-            llm_client = OpenAiLlmClient(config)
-        except LlmError as exc:
-            _report_error(
-                message_for_exception(exc),
-                EXIT_EXTERNAL_ERROR,
-                json_mode,
-                logger=logger,
-                event="rewrite.error",
-            )
         except FileIOError as exc:
             _report_error(
                 message_for_exception(exc),
@@ -469,10 +520,10 @@ def rewrite_cmd(
             )
 
         if print_output:
-            # Read back and print the generated prose
+            # In print mode, stdout should contain only the generated prose.
             try:
                 output_text = read_text_strict(out)
-                print(output_text)
+                sys.stdout.write(output_text)
             except FileIOError as exc:
                 _report_error(
                     message_for_exception(exc),
@@ -481,6 +532,8 @@ def rewrite_cmd(
                     logger=logger,
                     event="rewrite.error",
                 )
+            completed = True
+            return
 
         render_rewrite_result(result, json_mode=json_mode, no_color=no_color)
         completed = True
@@ -491,6 +544,7 @@ def rewrite_cmd(
 
 @app.command(name="verify")
 def verify_cmd(
+    ctx: typer.Context,
     output: str = typer.Argument(
         ...,
         help="Path to the output file to verify.",
@@ -512,6 +566,8 @@ def verify_cmd(
     ),
 ) -> None:
     """Check if text is AI-generated using a detector or local heuristic."""
+    json_mode = _effective_flag(ctx, json_mode, "json_mode")
+    no_color = _effective_flag(ctx, no_color, "no_color")
     counters = Counters()
     logger = _CliLogger(counters)
     completed = False
@@ -596,6 +652,7 @@ def verify_cmd(
 
 @app.command(name="diff-facts")
 def diff_facts_cmd(
+    ctx: typer.Context,
     ai_source: str = typer.Argument(
         ...,
         help="Path to the original AI-generated source file.",
@@ -616,6 +673,8 @@ def diff_facts_cmd(
     ),
 ) -> None:
     """Compare factual anchors between source and rewritten text."""
+    json_mode = _effective_flag(ctx, json_mode, "json_mode")
+    no_color = _effective_flag(ctx, no_color, "no_color")
     counters = Counters()
     logger = _CliLogger(counters)
     completed = False
@@ -659,6 +718,7 @@ def diff_facts_cmd(
 
 @app.command(name="scrub")
 def scrub_cmd(
+    ctx: typer.Context,
     file: str = typer.Argument(
         ...,
         help="Path to the file to audit or clean.",
@@ -685,6 +745,8 @@ def scrub_cmd(
     ),
 ) -> None:
     """Audit or clean metadata-like markers from a file."""
+    json_mode = _effective_flag(ctx, json_mode, "json_mode")
+    no_color = _effective_flag(ctx, no_color, "no_color")
     counters = Counters()
     logger = _CliLogger(counters)
     completed = False

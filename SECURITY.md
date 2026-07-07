@@ -16,7 +16,7 @@
 | API key leaks | `.env` ignored, env-only secrets, redaction, secret scan, no sample keys. |
 | LLM response contains hidden metadata | Response schema validation and metadata scrub before write. |
 | Fact drift or hallucination | Domain fact diff and repair loop, `diff-facts`, tests. |
-| Insecure endpoint exfiltration | Reject HTTP unless `HUMANHAND_ALLOW_INSECURE=1`; document local-only use. |
+| Insecure endpoint exfiltration | Reject HTTP unless `HUMANHAND_ALLOW_INSECURE=1` is set for localhost/127.0.0.1/::1 only. |
 | Detector/LLM API schema drift | Strict schema validation and clear errors. |
 | Input overwrite | File I/O rejects output path equal to input path. |
 | Supply-chain vulnerability | Lock file, Bandit, pip-audit, CI security checks. |

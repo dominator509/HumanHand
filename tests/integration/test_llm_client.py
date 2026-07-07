@@ -166,14 +166,33 @@ class TestOpenAiLlmClient:
 
     def test_http_endpoint_rejected(self) -> None:
         """Non-localhost HTTP endpoint without ``allow_insecure`` is rejected."""
-        config = Config(llm_base_url="http://api.openai.com/v1")
+        config = Config(llm_base_url="http://api.openai.com/v1", llm_model="gpt-4.1-mini")
         with pytest.raises(LlmError, match="HTTP is not allowed"):
+            OpenAiLlmClient(config)
+
+    def test_http_localhost_requires_allow_insecure(self) -> None:
+        """Loopback HTTP still requires explicit insecure opt-in."""
+        config = Config(llm_base_url="http://localhost:8080/v1", llm_model="local-model")
+        with pytest.raises(LlmError, match="HUMANHAND_ALLOW_INSECURE=1"):
+            OpenAiLlmClient(config)
+
+    def test_missing_endpoint_rejected(self) -> None:
+        """LLM client requires an explicit endpoint URL."""
+        config = Config()
+        with pytest.raises(LlmError, match="LLM endpoint URL is not configured"):
+            OpenAiLlmClient(config)
+
+    def test_missing_model_rejected(self) -> None:
+        """LLM client requires an explicit model name."""
+        config = Config(llm_base_url="https://api.openai.com/v1")
+        with pytest.raises(LlmError, match="LLM model is not configured"):
             OpenAiLlmClient(config)
 
     def test_http_localhost_accepted(self, contract: PromptContract) -> None:
         """HTTP localhost is accepted when ``allow_insecure`` is set."""
         config = Config(
             llm_base_url="http://localhost:8080/v1",
+            llm_model="local-model",
             allow_insecure=True,
         )
         with respx.mock:
@@ -197,6 +216,7 @@ class TestOpenAiLlmClient:
         config = Config(
             llm_base_url="https://api.openai.com/v1",
             llm_api_key="sk-very-secret-key",
+            llm_model="gpt-4.1-mini",
         )
         with respx.mock:
             route = respx.post("https://api.openai.com/v1/chat/completions")

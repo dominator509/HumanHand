@@ -48,12 +48,12 @@ Use `uv` for development. End users install the built wheel with `pip`. Do not r
 | Create GitHub repo and push | `gh repo create <name> --private --source . --remote origin --push` | GitHub repo created and branch pushed |
 | Push current branch | `git push -u origin main` | Upstream set and branch pushed |
 | Force-push current branch with lease | `git push --force-with-lease -u origin main` | Remote branch replaced and upstream set |
-| Local CLI help | `uv run humanhand --help` | Typer help text on stdout |
-| Local CLI version | `uv run humanhand --version` | Version text on stdout |
-| Local rewrite command | `uv run humanhand rewrite --source <source.txt> --style <style.txt> --out <output.txt>` | Status on stderr; output file created |
-| Local verify command | `uv run humanhand verify <output.txt>` | Human-likelihood result on stdout |
-| Local fact diff command | `uv run humanhand diff-facts <source.txt> <output.txt>` | Drift result on stdout |
-| Local scrub audit command | `uv run humanhand scrub --audit <file.txt>` | Metadata audit result on stdout |
+| Local CLI help | `sh scripts/cli.sh --help` | Typer help text on stdout |
+| Local CLI version | `sh scripts/cli.sh --version` | Version text on stdout |
+| Local rewrite command | `sh scripts/cli.sh rewrite --source <source.txt> --style <style.txt> --out <output.txt>` | Status on stderr; output file created |
+| Local verify command | `sh scripts/cli.sh verify <output.txt>` | Human-likelihood result on stdout |
+| Local fact diff command | `sh scripts/cli.sh diff-facts <source.txt> <output.txt>` | Drift result on stdout |
+| Local scrub audit command | `sh scripts/cli.sh scrub --audit <file.txt>` | Metadata audit result on stdout |
 | Local cache setup | No standalone setup. Cache is created lazily by `humanhand verify` when enabled. | Not applicable |
 | Migrations | No migration command. Cache schema is created/updated lazily and must be backward-compatible. | Not applicable |
 

@@ -71,6 +71,13 @@ def _parse_detector_provider(raw: str | None) -> str:
     return provider
 
 
+def _parse_optional_string(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    value = raw.strip()
+    return value if value else None
+
+
 def load_config() -> Config:
     """Load and validate configuration from environment variables.
 
@@ -108,7 +115,7 @@ def load_config() -> Config:
         detector_provider=_parse_detector_provider(os.getenv("HUMANHAND_DETECTOR_PROVIDER")),
         allow_insecure=allow_insecure,
         seed=seed,
-        llm_base_url=os.getenv("HUMANHAND_LLM_BASE_URL"),
-        llm_api_key=os.getenv("HUMANHAND_LLM_API_KEY"),
-        llm_model=os.getenv("HUMANHAND_LLM_MODEL"),
+        llm_base_url=_parse_optional_string(os.getenv("HUMANHAND_LLM_BASE_URL")),
+        llm_api_key=_parse_optional_string(os.getenv("HUMANHAND_LLM_API_KEY")),
+        llm_model=_parse_optional_string(os.getenv("HUMANHAND_LLM_MODEL")),
     )

@@ -19,13 +19,13 @@ Use uv for development. Do not use Poetry, pipenv, npm, pnpm, conda, or ad-hoc v
 
 | Name | Required | Environment | Example Value | Secret? | Description | Validation Rule |
 |---|---|---|---|---|---|---|
-| `HUMANHAND_LLM_BASE_URL` | Optional for local tests; required for live rewrite | local/live | `https://api.openai.com/v1` or `http://127.0.0.1:8000/v1` | No | OpenAI-compatible base URL. | Must be valid URL; reject `http://` unless `HUMANHAND_ALLOW_INSECURE=1`. |
+| `HUMANHAND_LLM_BASE_URL` | Optional for local tests; required for live rewrite | local/live | `https://api.openai.com/v1` or `http://127.0.0.1:8000/v1` | No | OpenAI-compatible base URL. | Must be valid URL; reject `http://` unless `HUMANHAND_ALLOW_INSECURE=1` and the host is localhost/127.0.0.1/::1. |
 | `HUMANHAND_LLM_API_KEY` | Optional unless endpoint requires it | local/live | `env-provided-secret` | Yes | API key for OpenAI-compatible endpoint. | Must never be logged; may be empty for local servers that do not require auth. |
 | `HUMANHAND_LLM_MODEL` | Optional until live calls | local/live | `gpt-4.1-mini` or local model name | No | Model passed to OpenAI-compatible endpoint. | Non-empty string when live LLM is used. Do not invent model names in code. |
 | `HUMANHAND_SEED` | Optional | all | `12345` | No | Deterministic seed. | Integer string when set. |
 | `HUMANHAND_MAX_CHARS` | Optional | all | `200000` | No | Input character cap. | Positive integer; default 200000. |
 | `HUMANHAND_TIMEOUT_SECONDS` | Optional | all | `30` | No | External call timeout. | Positive number; default 30. |
-| `HUMANHAND_ALLOW_INSECURE` | Optional | local only | `1` | No | Allows HTTP endpoints for local servers. | Only `1`, `true`, or `yes` enable; default false. |
+| `HUMANHAND_ALLOW_INSECURE` | Optional | local only | `1` | No | Allows HTTP endpoints for local loopback servers only. | Only `1`, `true`, or `yes` enable; default false. |
 | `HUMANHAND_CONFIG` | Optional | all | `C:\Users\me\humanhand.toml` | No | Optional config file path if implemented. | Must point to readable file when set. |
 | `HUMANHAND_CACHE_DIR` | Optional | all | `.cache/humanhand` | No | Cache directory for detector-score cache. | Must be writable when cache enabled; no text files allowed. |
 | `HUMANHAND_CACHE_ENABLED` | Optional | all | `1` | No | Enables/disables detector cache. | Boolean-like; default enabled only for detector scores if implemented. |

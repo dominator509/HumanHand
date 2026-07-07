@@ -37,6 +37,7 @@ class TestErrorCatalog:
             "config_invalid",
             "unknown_provider",
             "missing_llm_url",
+            "missing_llm_model",
             "unsafe_endpoint",
             "file_not_found",
             "not_a_file",
@@ -125,6 +126,10 @@ class TestErrorForExceptionLlmErrors:
     def test_llm_timeout(self) -> None:
         exc = LlmError("LLM request timed out after 3 retries")
         assert error_for_exception(exc) == "llm_timeout"
+
+    def test_missing_llm_model(self) -> None:
+        exc = LlmError("LLM model is not configured")
+        assert error_for_exception(exc) == "missing_llm_model"
 
     def test_llm_unsafe_endpoint(self) -> None:
         exc = LlmError("HTTP is not allowed for non-localhost endpoints")

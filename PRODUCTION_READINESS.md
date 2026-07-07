@@ -132,13 +132,13 @@ EP-010 must record:
 
 ## Checklist
 
-- [ ] EP-000 through EP-010 complete.
-- [ ] `sh scripts/verify.sh` passes.
-- [ ] `sh scripts/production-readiness-check.sh` passes.
-- [ ] `sh scripts/loop.sh` prints `build: complete`.
-- [ ] Wheel/sdist built.
-- [ ] Clean install smoke passes.
-- [ ] No secrets or user text leaks.
-- [ ] README/CHANGELOG/release notes updated.
-- [ ] Rollback drill documented.
-- [ ] Final Decision Log entry added.
+- [x] EP-000 through EP-010 complete.
+- [x] `sh scripts/verify.sh` passes.
+- [x] `sh scripts/production-readiness-check.sh` passes.
+- [x] `sh scripts/loop.sh` prints `build: complete`.
+- [x] Wheel/sdist built.
+- [x] Clean install smoke passes.
+- [x] No secrets or user text leaks.
+- [x] README/CHANGELOG/release notes updated.
+- [x] Rollback drill documented.
+- [x] Final Decision Log entry added.

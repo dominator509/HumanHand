@@ -33,7 +33,7 @@ This repository is configured for a two-agent local loop:
 Execution details for local shells:
 
 - `COMMANDS.md` remains the canonical command list and expected-output reference.
-- When executing an external command locally on this machine, wrap the command with `rtk`, for example `rtk sh scripts/preflight.sh`, `rtk sh scripts/verify.sh`, `rtk uv run humanhand --help`, or `rtk git diff --name-only`.
+- When executing an external command locally on this machine, wrap the command with `rtk`, for example `rtk sh scripts/preflight.sh`, `rtk sh scripts/verify.sh`, `rtk sh scripts/cli.sh --help`, or `rtk git diff --name-only`.
 - When a Windows builtin is the smallest safe tool, use `rtk proxy cmd /c ...`, for example `rtk proxy cmd /c type AGENTS.md` or `rtk proxy cmd /c dir /b`.
 - Do not rename repository commands just because RTK is used as a wrapper; the canonical command strings stay as documented in `COMMANDS.md`.
 
@@ -60,7 +60,7 @@ For every implementation session:
 10. Update the active ExecPlan Progress checkbox, Surprises & Discoveries, Decision Log, and Outcomes & Retrospective as work proceeds.
 11. Continue autonomously until the current ExecPlan is complete or a STOP condition applies. In local agent pairing mode, pause at the ExecPlan boundary for the Codex audit/fix pass before the next ExecPlan begins.
 12. Run the final validation commands required by the ExecPlan.
-13. Run `git diff --name-only` and compare changed files with Files to Change.
+13. Run `git diff --name-only` and `git status --short --branch`, then compare tracked and untracked changes with Files to Change.
 14. Justify any extra changed file in the ExecPlan Decision Log.
 15. Write `.agent/state/last-result.env` as the final file operation of the session.
 16. Provide the required final response.
@@ -184,7 +184,7 @@ An ExecPlan is done only when:
 - All acceptance criteria pass.
 - Required validation commands pass.
 - The active ExecPlan Progress, Decision Log, Surprises & Discoveries, and Outcomes & Retrospective are updated.
-- `git diff --name-only` was reviewed against Files to Change.
+- `git diff --name-only` and `git status --short --branch` were reviewed against Files to Change.
 - Extra changed files are justified in the Decision Log.
 - No secrets, user text logs, hidden metadata, or out-of-scope features were introduced.
 - `.agent/state/last-result.env` was written as the final file operation.

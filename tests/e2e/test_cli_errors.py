@@ -89,8 +89,12 @@ class TestFileErrors:
         assert result.stderr.rstrip().endswith("error: File not found")
         assert str(missing_path) not in result.stderr
 
-    def test_missing_style_file_error(self, source_file: str) -> None:
+    def test_missing_style_file_error(
+        self, source_file: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Rewrite with missing style file produces error."""
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "https://example.com/v1")
+        monkeypatch.setenv("HUMANHAND_LLM_MODEL", "example-model")
         result = runner.invoke(
             app,
             [
@@ -106,8 +110,29 @@ class TestFileErrors:
         assert result.exit_code != 0
         assert "File not found" in result.stderr
 
-    def test_missing_source_file_error(self, style_file: str) -> None:
+    def test_missing_style_file_error_precedes_llm_config(self, source_file: str) -> None:
+        """Rewrite surfaces style path errors before missing LLM config."""
+        result = runner.invoke(
+            app,
+            [
+                "rewrite",
+                "--source",
+                source_file,
+                "--style",
+                "nonexistent_style_file.txt",
+                "--out",
+                "out_style_error.txt",
+            ],
+        )
+        assert result.exit_code == EXIT_IO_ERROR
+        assert result.stderr.rstrip().endswith("error: File not found")
+
+    def test_missing_source_file_error(
+        self, style_file: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Rewrite with missing source file produces error."""
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "https://example.com/v1")
+        monkeypatch.setenv("HUMANHAND_LLM_MODEL", "example-model")
         result = runner.invoke(
             app,
             [
@@ -122,6 +147,23 @@ class TestFileErrors:
         )
         assert result.exit_code != 0
         assert "File not found" in result.stderr
+
+    def test_missing_source_file_error_precedes_llm_config(self, style_file: str) -> None:
+        """Rewrite surfaces source path errors before missing LLM config."""
+        result = runner.invoke(
+            app,
+            [
+                "rewrite",
+                "--source",
+                "nonexistent_source_file.txt",
+                "--style",
+                style_file,
+                "--out",
+                "out_source_error.txt",
+            ],
+        )
+        assert result.exit_code == EXIT_IO_ERROR
+        assert result.stderr.rstrip().endswith("error: File not found")
 
     def test_bom_file_rejected_with_clear_message(self, tmp_path: Path) -> None:
         """BOM file is rejected with clear error message."""
@@ -139,8 +181,12 @@ class TestFileErrors:
         assert result.exit_code != 0
         assert "empty" in result.stderr.lower() or "whitespace" in result.stderr.lower()
 
-    def test_rewrite_empty_source_caught_by_strict_read(self, tmp_path: Path) -> None:
+    def test_rewrite_empty_source_caught_by_strict_read(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Rewrite with empty source file is caught before LLM call."""
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "https://example.com/v1")
+        monkeypatch.setenv("HUMANHAND_LLM_MODEL", "example-model")
         empty_file = tmp_path / "empty_rewrite_source.txt"
         empty_file.write_text("")
         result = runner.invoke(
@@ -159,9 +205,30 @@ class TestFileErrors:
         assert "whitespace" in result.stderr.lower() or "empty" in result.stderr.lower()
 
     def test_rewrite_rejects_output_path_matching_source(
-        self, source_file: str, style_file: str
+        self, source_file: str, style_file: str, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Rewrite rejects output paths that match an input file."""
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "https://example.com/v1")
+        monkeypatch.setenv("HUMANHAND_LLM_MODEL", "example-model")
+        result = runner.invoke(
+            app,
+            [
+                "rewrite",
+                "--source",
+                source_file,
+                "--style",
+                style_file,
+                "--out",
+                source_file,
+            ],
+        )
+        assert result.exit_code == EXIT_IO_ERROR
+        assert result.stderr.rstrip().endswith("error: Output path must not match any input path")
+
+    def test_rewrite_output_path_error_precedes_llm_config(
+        self, source_file: str, style_file: str
+    ) -> None:
+        """Rewrite surfaces output/input path overlap before missing LLM config."""
         result = runner.invoke(
             app,
             [
@@ -386,6 +453,57 @@ class TestConfigErrors:
         assert result.exit_code == EXIT_CONFIG_ERROR
         assert "configuration is invalid" in result.stderr.lower()
 
+    def test_rewrite_missing_llm_url(self, tmp_path: Path) -> None:
+        """Rewrite fails clearly when no LLM endpoint URL is configured."""
+        source = tmp_path / "rewrite_source.txt"
+        source.write_text("The Eiffel Tower is 330 meters tall.\n")
+        style = tmp_path / "rewrite_style.txt"
+        style.write_text("I write in short, direct sentences.\n")
+        out = tmp_path / "rewrite_out.txt"
+
+        result = runner.invoke(
+            app,
+            [
+                "rewrite",
+                "--source",
+                str(source),
+                "--style",
+                str(style),
+                "--out",
+                str(out),
+            ],
+        )
+
+        assert result.exit_code == EXIT_CONFIG_ERROR
+        assert result.stderr.rstrip().endswith("error: LLM endpoint URL is not configured")
+
+    def test_rewrite_missing_llm_model(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Rewrite fails clearly when no LLM model is configured."""
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "https://example.com/v1")
+        source = tmp_path / "rewrite_source.txt"
+        source.write_text("The Eiffel Tower is 330 meters tall.\n")
+        style = tmp_path / "rewrite_style.txt"
+        style.write_text("I write in short, direct sentences.\n")
+        out = tmp_path / "rewrite_out.txt"
+
+        result = runner.invoke(
+            app,
+            [
+                "rewrite",
+                "--source",
+                str(source),
+                "--style",
+                str(style),
+                "--out",
+                str(out),
+            ],
+        )
+
+        assert result.exit_code == EXIT_CONFIG_ERROR
+        assert result.stderr.rstrip().endswith("error: LLM model is not configured")
+
 
 # ── Argument errors ──────────────────────────────────────────────
 
@@ -435,6 +553,8 @@ class TestRewriteSizeErrors:
     ) -> None:
         """Source exceeding max_chars produces error."""
         monkeypatch.setenv("HUMANHAND_MAX_CHARS", "1")
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "https://example.com/v1")
+        monkeypatch.setenv("HUMANHAND_LLM_MODEL", "example-model")
         source = tmp_path / "src_too_large.txt"
         source.write_text("Source text longer than 1 char")
         style = tmp_path / "style_too_large.txt"
@@ -458,6 +578,8 @@ class TestRewriteSizeErrors:
     def test_rewrite_style_too_large(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Style exceeding max_chars produces error."""
         monkeypatch.setenv("HUMANHAND_MAX_CHARS", "5")
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "https://example.com/v1")
+        monkeypatch.setenv("HUMANHAND_LLM_MODEL", "example-model")
         source = tmp_path / "src_short.txt"
         source.write_text("Short")
         style = tmp_path / "style_long.txt"
@@ -481,6 +603,8 @@ class TestRewriteSizeErrors:
     def test_rewrite_size_json_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Size limit error in JSON mode produces valid JSON error."""
         monkeypatch.setenv("HUMANHAND_MAX_CHARS", "1")
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "https://example.com/v1")
+        monkeypatch.setenv("HUMANHAND_LLM_MODEL", "example-model")
         source = tmp_path / "src_json.txt"
         source.write_text("Too long source text")
         style = tmp_path / "style_json.txt"
@@ -565,6 +689,16 @@ class TestErrorMapping:
         """LlmError with 'timed out' maps to llm_timeout."""
         exc = LlmError("Request timed out after 30s")
         assert error_for_exception(exc) == "llm_timeout"
+
+    def test_error_for_exception_missing_llm_url(self) -> None:
+        """Missing configured LLM URL maps to missing_llm_url."""
+        exc = LlmError("LLM endpoint URL is not configured")
+        assert error_for_exception(exc) == "missing_llm_url"
+
+    def test_error_for_exception_missing_llm_model(self) -> None:
+        """Missing configured LLM model maps to missing_llm_model."""
+        exc = LlmError("LLM model is not configured")
+        assert error_for_exception(exc) == "missing_llm_model"
 
     def test_error_for_exception_llm_unsafe_endpoint(self) -> None:
         """LlmError with 'http is not allowed' maps to unsafe_endpoint."""

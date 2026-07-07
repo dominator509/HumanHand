@@ -98,3 +98,14 @@ class TestLoadConfigDetectorProvider:
         monkeypatch.setenv("HUMANHAND_DETECTOR_PROVIDER", "mystery-ai")
         with pytest.raises(ValueError, match="Unknown detector provider"):
             load_config()
+
+
+class TestLoadConfigOptionalStrings:
+    def test_empty_llm_values_become_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "")
+        monkeypatch.setenv("HUMANHAND_LLM_API_KEY", "   ")
+        monkeypatch.setenv("HUMANHAND_LLM_MODEL", "\t")
+        config = load_config()
+        assert config.llm_base_url is None
+        assert config.llm_api_key is None
+        assert config.llm_model is None

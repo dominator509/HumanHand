@@ -109,6 +109,13 @@ class TestJsonHealth:
         data = json.loads(result.stdout)
         assert data["config_error"] is None
 
+    def test_root_json_flag_health(self) -> None:
+        """Root-level --json propagates to the health command."""
+        result = runner.invoke(app, ["--json", "health"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
 
 # ── Verify JSON ─────────────────────────────────────────────────
 
@@ -262,8 +269,12 @@ class TestJsonError:
         assert isinstance(data["exit_code"], int)
         assert data["exit_code"] > 0
 
-    def test_json_rewrite_missing_source_error_shape(self, style_file: str) -> None:
+    def test_json_rewrite_missing_source_error_shape(
+        self, style_file: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Rewrite with missing source in JSON mode produces valid error JSON."""
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "https://example.com/v1")
+        monkeypatch.setenv("HUMANHAND_LLM_MODEL", "example-model")
         result = runner.invoke(
             app,
             [
@@ -334,6 +345,8 @@ class TestJsonError:
     ) -> None:
         """JSON error for source too large has correct exit code."""
         monkeypatch.setenv("HUMANHAND_MAX_CHARS", "1")
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "https://example.com/v1")
+        monkeypatch.setenv("HUMANHAND_LLM_MODEL", "example-model")
         source = tmp_path / "src_json_too_large.txt"
         source.write_text("Longer source text")
         style = tmp_path / "style_json_too_large.txt"
@@ -357,6 +370,60 @@ class TestJsonError:
         assert data["status"] == "error"
         assert "message" in data
         assert data["exit_code"] == EXIT_INPUT_ERROR
+
+    def test_json_rewrite_rejects_print_combination(
+        self, source_file: str, style_file: str, tmp_path: Path
+    ) -> None:
+        """Rewrite rejects --json with --print to preserve JSON-only stdout."""
+        out = tmp_path / "out_json_print_conflict.txt"
+        result = runner.invoke(
+            app,
+            [
+                "rewrite",
+                "--source",
+                source_file,
+                "--style",
+                style_file,
+                "--out",
+                str(out),
+                "--json",
+                "--print",
+            ],
+        )
+        assert result.exit_code == EXIT_INPUT_ERROR
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+        assert data["exit_code"] == EXIT_INPUT_ERROR
+        assert "--print" in data["message"]
+        assert "--json" in data["message"]
+        assert not out.exists()
+
+    def test_root_json_rewrite_rejects_print_combination(
+        self, source_file: str, style_file: str, tmp_path: Path
+    ) -> None:
+        """Root-level --json also rejects rewrite --print for JSON-only stdout."""
+        out = tmp_path / "out_root_json_print_conflict.txt"
+        result = runner.invoke(
+            app,
+            [
+                "--json",
+                "rewrite",
+                "--source",
+                source_file,
+                "--style",
+                style_file,
+                "--out",
+                str(out),
+                "--print",
+            ],
+        )
+        assert result.exit_code == EXIT_INPUT_ERROR
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+        assert data["exit_code"] == EXIT_INPUT_ERROR
+        assert "--print" in data["message"]
+        assert "--json" in data["message"]
+        assert not out.exists()
 
 
 # ── JSON output hygiene ─────────────────────────────────────────

@@ -1,8 +1,8 @@
 # Human Hand
 
-Human Hand v1.0 is a Windows-first, privacy-preserving Python 3.11 CLI for rewriting AI-assisted source text into a supplied human writing style while preserving facts, stripping metadata, and supporting verification workflows.
+Human Hand is a Windows-first, privacy-preserving Python 3.11 CLI for rewriting AI-assisted source text into a supplied human writing style while preserving facts, stripping metadata, and supporting verification workflows.
 
-All ExecPlans EP-000 through EP-010 are complete. The package installs, the CLI works with 5 commands, and all baseline validations pass (774 tests, 95% coverage).
+All ExecPlans EP-000 through EP-010 are complete. The package installs, the CLI works with 5 commands, and the latest audited validation totals are recorded in [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md).
 
 ## Goals
 
@@ -14,12 +14,14 @@ All ExecPlans EP-000 through EP-010 are complete. The package installs, the CLI 
 
 ## Current Status
 
-- All ExecPlans EP-000 through EP-010 are complete. Human Hand v1.0 is production-ready.
+- All ExecPlans EP-000 through EP-010 are complete. Human Hand is production-ready for local package use.
 - Five CLI commands are functional: `health`, `rewrite`, `verify`, `diff-facts`, and `scrub`.
 - Every command supports `--json` for machine-readable output and `--no-color` for ANSI-free output.
 - The `rewrite` command supports `--print` for printing generated prose to stdout.
-- 774 tests, 95% coverage, CI matrix (Windows + Ubuntu), manual release workflow.
-- MIT licensed. Built with Python 3.11, Typer, httpx, and Pydantic.
+- Audited validation totals are tracked in `PRODUCTION_READINESS.md`, alongside the CI matrix (Windows + Ubuntu) and the manual release workflow.
+- Current package version: `1.0.0`.
+- License selection is still pending maintainer decision.
+- Built with Python 3.11, Typer, httpx, and Pydantic.
 
 ## Quick Start
 
@@ -61,13 +63,12 @@ humanhand health --json
 
 ### `humanhand rewrite`
 
-Rewrite AI-assisted text to match a human writing style. Requires a configured LLM endpoint.
+Rewrite AI-assisted text to match a human writing style. Requires a configured LLM endpoint and model.
 
 ```bash
 humanhand rewrite --source draft.txt --style sample.txt --out output.txt
 humanhand rewrite --source draft.txt --style sample.txt --out output.txt --json
 humanhand rewrite --source draft.txt --style sample.txt --out output.txt --print
-humanhand rewrite --source draft.txt --style sample.txt --out output.txt --json --print
 ```
 
 | Flag | Description |
@@ -76,7 +77,7 @@ humanhand rewrite --source draft.txt --style sample.txt --out output.txt --json 
 | `--style` | Path to human writing sample file (required) |
 | `--out` | Path for the rewritten output file (required) |
 | `--json` | Print JSON status to stdout only |
-| `--print` | Print generated prose to stdout (off by default) |
+| `--print` | Print generated prose to stdout in text mode only (off by default) |
 | `--no-color` | Disable color output |
 
 ### `humanhand verify`
@@ -168,6 +169,8 @@ To also print generated prose to stdout, pass the `--print` flag:
 humanhand rewrite --source draft.txt --style sample.txt --out output.txt --print
 ```
 
+`--print` is a text-mode-only option and cannot be combined with `--json`.
+
 This design ensures that piping or redirecting command output never mixes machine-readable status with generated content.
 
 ### Example Output
@@ -204,7 +207,7 @@ Audit complete: 1 finding(s)
 
 ```
 $ humanhand health --json
-{"status":"ok","version":"0.1.0","python_version":"3.11.0 (main, ...)","platform":"win32","llm_configured":false,"detector_provider":"local","cache_enabled":true,"cache_dir":"...","config_valid":true,"config_error":null,"commands":{"diff-facts":true,"health":true,"rewrite":true,"scrub":true,"verify":true}}
+{"status":"ok","version":"1.0.0","python_version":"3.11.0 (main, ...)","platform":"win32","llm_configured":false,"detector_provider":"local","cache_enabled":true,"cache_dir":"...","config_valid":true,"config_error":null,"commands":{"diff-facts":true,"health":true,"rewrite":true,"scrub":true,"verify":true}}
 
 $ humanhand verify output.txt --json
 {"status":"ok","provider":"local","model":"heuristic","score":0.2340,"label":"human","cache_hit":false,"duration_ms":1.2}
@@ -261,7 +264,8 @@ The default local coding loop is:
 3. Read `AGENTS.md`, `COMMANDS.md`, and the active ExecPlan before editing.
 4. Read [CLAUDE.md](CLAUDE.md) for the full development setup guide, including model preferences, handoff loop, and RTK wrapper rules.
 5. Run `sh scripts/preflight.sh`.
-6. Use the commands documented in `COMMANDS.md` for install, lint, typecheck, tests, build, and verification.
+6. In a repo checkout, prefer `sh scripts/cli.sh ...` for local CLI runs so `uv` stays on repo-local cache and temp paths instead of machine-global locations on Windows.
+7. Use the commands documented in `COMMANDS.md` for install, lint, typecheck, tests, build, and verification.
 
 ## Documentation Map
 

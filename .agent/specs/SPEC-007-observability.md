@@ -42,7 +42,8 @@ Users and maintainers can diagnose local CLI issues with safe structured logs, c
 - Required log fields implemented where applicable.
 - Redaction applied to secrets and text-like fields.
 - Local counters emitted for command runs.
-- `humanhand health --json` validates config shape without network by default.
+- `humanhand health --json` validates config shape and endpoint safety without network by default.
+- `humanhand health --json` reports `llm_configured=true` only when live rewrite has both an endpoint URL and a model configured.
 - No remote telemetry code.
 
 ## Inputs

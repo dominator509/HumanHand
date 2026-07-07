@@ -96,7 +96,7 @@ Done means:
 - All validations pass.
 - Acceptance criteria pass.
 - Final diff reviewed.
-- Expected changed files match actual changed files or extra files are justified.
+- Expected changed files match actual changed files and untracked additions, or extra files are justified.
 - Remaining risks documented.
 - `.agent/state/last-result.env` written.
 - Final response includes required status report.

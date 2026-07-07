@@ -125,8 +125,20 @@ class TestHealthConfigValidation:
 
     def test_llm_configured_when_url_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "https://api.openai.com/v1")
+        monkeypatch.setenv("HUMANHAND_LLM_MODEL", "gpt-4.1-mini")
         data = _invoke_health("--json")
         assert data["llm_configured"] is True
+
+    def test_llm_not_configured_for_empty_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "")
+        data = _invoke_health("--json")
+        assert data["llm_configured"] is False
+
+    def test_llm_not_configured_for_missing_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "https://api.openai.com/v1")
+        monkeypatch.delenv("HUMANHAND_LLM_MODEL", raising=False)
+        data = _invoke_health("--json")
+        assert data["llm_configured"] is False
 
     def test_cache_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("HUMANHAND_CACHE_ENABLED", "false")
@@ -138,6 +150,7 @@ class TestHealthConfigValidation:
         monkeypatch.setenv("HUMANHAND_DETECTOR_PROVIDER", "copyleaks")
         monkeypatch.setenv("HUMANHAND_CACHE_ENABLED", "false")
         monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "https://example.com/api")
+        monkeypatch.setenv("HUMANHAND_LLM_MODEL", "example-model")
         data = _invoke_health("--json")
         assert data["cache_dir"] == "/custom/cache"
         assert data["detector_provider"] == "copyleaks"
@@ -186,6 +199,14 @@ class TestHealthTextMode:
         assert result.exit_code == 0
         with pytest.raises(json.JSONDecodeError):
             json.loads(result.stdout)
+
+    def test_text_mode_surfaces_invalid_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Text mode should not report health: ok when config loading failed."""
+        monkeypatch.setenv("HUMANHAND_DETECTOR_PROVIDER", "nonexistent_provider")
+        result = runner.invoke(app, ["health", "--no-color"])
+        assert result.exit_code == 0
+        assert "configuration is invalid" in result.stdout.lower()
+        assert "health: ok" not in result.stdout.lower()
 
 
 # ── Health offline guarantee tests ────────────────────────────────
@@ -321,20 +342,58 @@ class TestHealthCacheAndEndpoint:
             f"Expected False for malformed URL, got {data['endpoint_url_valid']}"
         )
 
-    def test_endpoint_url_valid_with_localhost_http(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """A valid localhost HTTP URL should be syntactically valid."""
+    def test_endpoint_url_valid_with_localhost_http_without_flag(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A localhost HTTP URL still requires explicit insecure opt-in."""
         monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "http://localhost:8080/v1")
+        monkeypatch.delenv("HUMANHAND_ALLOW_INSECURE", raising=False)
+        data = _invoke_health("--json")
+        assert data["endpoint_url_valid"] is False, (
+            "Expected False for localhost HTTP URL when "
+            f"HUMANHAND_ALLOW_INSECURE is unset, got {data['endpoint_url_valid']}"
+        )
+
+    def test_endpoint_url_valid_with_localhost_http_with_flag(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A localhost HTTP URL should be allowed when insecure mode is enabled."""
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "http://localhost:8080/v1")
+        monkeypatch.setenv("HUMANHAND_ALLOW_INSECURE", "true")
         data = _invoke_health("--json")
         assert data["endpoint_url_valid"] is True, (
-            f"Expected True for localhost URL, got {data['endpoint_url_valid']}"
+            "Expected True for localhost HTTP URL when "
+            f"HUMANHAND_ALLOW_INSECURE=true, got {data['endpoint_url_valid']}"
+        )
+
+    def test_endpoint_url_valid_with_non_localhost_http_without_flag(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A non-localhost HTTP URL should be rejected when insecure mode is off."""
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "http://example.com/v1")
+        monkeypatch.delenv("HUMANHAND_ALLOW_INSECURE", raising=False)
+        data = _invoke_health("--json")
+        assert data["endpoint_url_valid"] is False, (
+            "Expected False for insecure non-localhost HTTP URL when "
+            f"HUMANHAND_ALLOW_INSECURE is unset, got {data['endpoint_url_valid']}"
+        )
+
+    def test_endpoint_url_valid_with_non_localhost_http_with_flag(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A non-localhost HTTP URL should still be rejected with the flag."""
+        monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "http://example.com/v1")
+        monkeypatch.setenv("HUMANHAND_ALLOW_INSECURE", "true")
+        data = _invoke_health("--json")
+        assert data["endpoint_url_valid"] is False, (
+            "Expected False for insecure non-localhost HTTP URL even when "
+            f"HUMANHAND_ALLOW_INSECURE=true, got {data['endpoint_url_valid']}"
         )
 
     def test_endpoint_url_valid_with_empty_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """An empty string URL should be treated as not configured (None)."""
         monkeypatch.setenv("HUMANHAND_LLM_BASE_URL", "")
         data = _invoke_health("--json")
-        # Empty string is falsy in Python, so the health check skips URL
-        # parsing entirely and reports None (not configured).
         assert data["endpoint_url_valid"] is None, (
             f"Expected None for empty URL, got {data['endpoint_url_valid']}"
         )

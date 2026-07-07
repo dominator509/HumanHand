@@ -29,8 +29,6 @@ class OpenAiLlmClient(LlmClient):
     error messages are scrubbed of sensitive data.
     """
 
-    _MODEL_DEFAULT = "gpt-4o-mini"
-    _BASE_URL_DEFAULT = "https://api.openai.com"
     _MAX_RETRIES = 3
 
     def __init__(self, config: Config) -> None:
@@ -44,7 +42,12 @@ class OpenAiLlmClient(LlmClient):
             LlmError: If endpoint validation or client construction fails.
         """
         self._config = config
-        base_url = config.llm_base_url or self._BASE_URL_DEFAULT
+        if config.llm_base_url is None:
+            raise LlmError("LLM endpoint URL is not configured")
+        if config.llm_model is None:
+            raise LlmError("LLM model is not configured")
+
+        base_url = config.llm_base_url
 
         try:
             validated = validate_endpoint(base_url, config.allow_insecure)
@@ -52,7 +55,7 @@ class OpenAiLlmClient(LlmClient):
             raise LlmError(str(exc)) from exc
 
         self._base_url = validated
-        self._model = config.llm_model or self._MODEL_DEFAULT
+        self._model = config.llm_model
 
         try:
             self._client = build_client(

@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import subprocess
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 from typer.testing import CliRunner
@@ -113,6 +116,66 @@ class TestInfoCommands:
         assert "humanhand" in result.stdout
         assert re.search(r"\d+\.\d+\.\d+", result.stdout)
 
+    def test_repo_cli_script_uses_repo_local_cache(self, tmp_path: Path) -> None:
+        """scripts/cli.sh keeps uv cache/temp paths inside the repo-defined cache root."""
+        cache_root = tmp_path / "repo-cache"
+        env = os.environ.copy()
+        env.pop("UV_CACHE_DIR", None)
+        env.pop("TMPDIR", None)
+        env.pop("TMP", None)
+        env.pop("TEMP", None)
+        env["CACHE_ROOT"] = str(cache_root)
+
+        result = subprocess.run(
+            ["sh", "scripts/cli.sh", "--version"],
+            capture_output=True,
+            cwd=Path.cwd(),
+            encoding="utf-8",
+            env=env,
+            check=False,
+        )
+
+        assert result.returncode == 0
+        assert "humanhand" in result.stdout.lower()
+        assert (cache_root / "uv").is_dir()
+        assert (cache_root / "tmp").is_dir()
+
+    def test_dependency_audit_script_uses_repo_local_cache(self, tmp_path: Path) -> None:
+        """scripts/dependency-audit.sh exports a repo-local pip-audit cache path."""
+        cache_root = tmp_path / "audit-cache-root"
+        fake_bin = tmp_path / "bin"
+        fake_bin.mkdir()
+        fake_uv = fake_bin / "uv"
+        fake_uv.write_text(
+            "#!/usr/bin/env sh\n"
+            "set -eu\n"
+            "printf 'cache=%s\\n' \"${PIP_AUDIT_CACHE_DIR:-}\"\n"
+            "printf 'args=%s\\n' \"$*\"\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        fake_uv.chmod(fake_uv.stat().st_mode | 0o111)
+
+        env = os.environ.copy()
+        env["CACHE_ROOT"] = str(cache_root)
+        env["PATH"] = f"{fake_bin}{os.pathsep}{env.get('PATH', '')}"
+
+        result = subprocess.run(
+            ["sh", "scripts/dependency-audit.sh"],
+            capture_output=True,
+            cwd=Path.cwd(),
+            encoding="utf-8",
+            env=env,
+            check=False,
+        )
+
+        assert result.returncode == 0
+        expected_cache = str(cache_root / "pip-audit").replace("\\", "/")
+        assert f"cache={expected_cache}" in result.stdout.replace("\\", "/")
+        assert "args=run pip-audit" in result.stdout
+        assert "dependency audit: ok" in result.stdout
+        assert (cache_root / "pip-audit").is_dir()
+
     def test_rewrite_help_lists_all_options(self) -> None:
         """Rewrite --help lists --source, --style, --out, --print, --json, --no-color."""
         result = runner.invoke(app, ["rewrite", "--help"])
@@ -197,6 +260,23 @@ class TestNoColorFlag:
         """Diff-facts output with --no-color has no ANSI escape sequences."""
         result = runner.invoke(app, ["diff-facts", source_file, output_file, "--no-color"])
         assert result.exit_code == 0
+        assert "\033[" not in result.stdout
+
+    def test_root_no_color_flag_propagates(
+        self, output_file: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Root-level --no-color propagates into colorized subcommand output."""
+        seen_flags: list[bool] = []
+
+        def fake_color_enabled(no_color_flag: bool = False) -> bool:
+            seen_flags.append(no_color_flag)
+            return not no_color_flag
+
+        monkeypatch.setattr("humanhand.cli.output._color_enabled", fake_color_enabled)
+        result = runner.invoke(app, ["--no-color", "verify", output_file])
+        assert result.exit_code == 0
+        assert seen_flags
+        assert all(seen_flags)
         assert "\033[" not in result.stdout
 
 
@@ -367,10 +447,13 @@ class TestTextOutput:
         assert "Output" in result.stdout
 
     def test_rewrite_help_has_print_option(self) -> None:
-        """Rewrite --help lists --print option for generated prose."""
+        """Rewrite --help marks --print as text-mode-only output."""
         result = runner.invoke(app, ["rewrite", "--help"])
         assert result.exit_code == 0
         assert "--print" in result.stdout
+        normalized = " ".join(result.stdout.lower().split())
+        sanitized = normalized.replace("│", " ")
+        assert "text mode only" in " ".join(sanitized.split())
 
 
 # ── No prose without --print ─────────────────────────────────────
@@ -384,6 +467,68 @@ class TestNoProseWithoutPrint:
         result = runner.invoke(app, ["rewrite", "--help"])
         assert result.exit_code == 0
         assert "--print" in result.stdout
+
+    def test_rewrite_print_stdout_is_prose_only(
+        self,
+        source_file: str,
+        style_file: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Rewrite --print keeps stdout limited to the generated prose."""
+        expected_output = "A calmer, more human rewrite.\n"
+        out_path = tmp_path / "rewrite_print_only.txt"
+
+        monkeypatch.setattr(
+            "humanhand.cli.app.load_config",
+            lambda: Config(
+                llm_base_url="https://example.com/v1",
+                llm_model="test-model",
+            ),
+        )
+        monkeypatch.setattr("humanhand.cli.app.OpenAiLlmClient", lambda config: object())
+
+        def fake_rewrite(
+            *,
+            source_text: str,
+            style_text: str,
+            output_path: str,
+            llm_client: object,
+            file_writer: Any,
+            logger: object,
+            max_chars: int = 200_000,
+            max_repair_attempts: int = 3,
+            seed: int | None = None,
+        ) -> RewriteResult:
+            del llm_client, logger, max_chars, max_repair_attempts, seed
+            written_path = file_writer.write(output_path, expected_output, input_paths=[])
+            return RewriteResult(
+                output_path=str(written_path),
+                input_chars=len(source_text) + len(style_text),
+                output_chars=len(expected_output),
+                preservation_score=0.99,
+            )
+
+        monkeypatch.setattr("humanhand.cli.app.rewrite", fake_rewrite)
+
+        result = runner.invoke(
+            app,
+            [
+                "rewrite",
+                "--source",
+                source_file,
+                "--style",
+                style_file,
+                "--out",
+                str(out_path),
+                "--print",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert result.stdout == expected_output
+        assert "Rewrite complete" not in result.stdout
+        assert expected_output not in result.stderr
 
 
 # ── Exact output format ──────────────────────────────────────────
@@ -463,6 +608,14 @@ class TestColorEnabled:
         monkeypatch.setattr("humanhand.cli.output.sys.stdout.isatty", lambda: False)
         monkeypatch.setattr("humanhand.cli.output.sys.platform", "linux")
         assert _color_enabled() is False
+
+    def test_windows_term_uppercase_xterm(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Windows ANSI TERM detection accepts uppercase xterm values."""
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setenv("TERM", "XTERM-256COLOR")
+        monkeypatch.setattr("humanhand.cli.output.sys.stdout.isatty", lambda: True)
+        monkeypatch.setattr("humanhand.cli.output.sys.platform", "win32")
+        assert _color_enabled() is True
 
 
 class TestStatus:

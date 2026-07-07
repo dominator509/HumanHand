@@ -26,21 +26,25 @@ class TestEndpointValidation:
         with pytest.raises(HttpError, match="HTTP is not allowed"):
             validate_endpoint("http://api.example.com/v1")
 
-    def test_http_localhost_allowed_without_flag(self) -> None:
-        url = validate_endpoint("http://localhost:8080/v1")
+    def test_http_localhost_rejected_without_flag(self) -> None:
+        with pytest.raises(HttpError, match="HUMANHAND_ALLOW_INSECURE=1"):
+            validate_endpoint("http://localhost:8080/v1")
+
+    def test_http_localhost_allowed_with_flag(self) -> None:
+        url = validate_endpoint("http://localhost:8080/v1", allow_insecure=True)
         assert url.startswith("http://")
 
-    def test_http_127_0_0_1_allowed(self) -> None:
-        url = validate_endpoint("http://127.0.0.1:8080/v1")
+    def test_http_127_0_0_1_allowed_with_flag(self) -> None:
+        url = validate_endpoint("http://127.0.0.1:8080/v1", allow_insecure=True)
         assert url.startswith("http://")
 
-    def test_http_ipv6_localhost_allowed(self) -> None:
-        url = validate_endpoint("http://[::1]:8080/v1")
+    def test_http_ipv6_localhost_allowed_with_flag(self) -> None:
+        url = validate_endpoint("http://[::1]:8080/v1", allow_insecure=True)
         assert url.startswith("http://")
 
-    def test_http_non_localhost_allowed_with_flag(self) -> None:
-        url = validate_endpoint("http://api.example.com/v1", allow_insecure=True)
-        assert url.startswith("http://")
+    def test_http_non_localhost_rejected_with_flag(self) -> None:
+        with pytest.raises(HttpError, match="non-local endpoints"):
+            validate_endpoint("http://api.example.com/v1", allow_insecure=True)
 
     def test_missing_scheme_rejected(self) -> None:
         with pytest.raises(HttpError, match="Missing scheme"):
@@ -178,26 +182,17 @@ class TestClientConstructionSecurity:
     def test_insecure_endpoint_rejected_in_llm_client(self) -> None:
         config = Config(
             llm_base_url="http://api.openai.com/v1",
+            llm_model="gpt-4.1-mini",
             allow_insecure=False,
         )
         with pytest.raises(LlmError, match="HTTP is not allowed"):
             OpenAiLlmClient(config)
 
-    def test_llm_client_respects_allow_insecure_flag(self) -> None:
+    def test_llm_client_rejects_non_local_http_even_with_flag(self) -> None:
         config = Config(
             llm_base_url="http://192.168.1.1:8080/v1",
+            llm_model="local-model",
             allow_insecure=True,
         )
-        with respx.mock:
-            respx.post("http://192.168.1.1:8080/v1/chat/completions").respond(
-                status_code=200,
-                json={"choices": [{"message": {"content": "OK"}}]},
-            )
-            client = OpenAiLlmClient(config)
-            result = client.rewrite(
-                PromptContract(
-                    system_message="sys",
-                    user_message="usr",
-                )
-            )
-            assert result == "OK"
+        with pytest.raises(LlmError, match="HTTP is not allowed"):
+            OpenAiLlmClient(config)

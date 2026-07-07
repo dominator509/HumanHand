@@ -22,8 +22,10 @@ ERROR_MESSAGES: dict[str, str] = {
     "config_invalid": "Configuration is invalid",
     "unknown_provider": "Unknown detector provider",
     "missing_llm_url": "LLM endpoint URL is not configured",
+    "missing_llm_model": "LLM model is not configured",
     "unsafe_endpoint": (
-        "HTTP is not allowed for remote endpoints — use HTTPS or set HUMANHAND_ALLOW_INSECURE=1"
+        "HTTP is allowed only for localhost endpoints with "
+        "HUMANHAND_ALLOW_INSECURE=1; otherwise use HTTPS"
     ),
     # I/O errors (exit code 3)
     "file_not_found": "File not found",
@@ -93,6 +95,10 @@ def error_for_exception(exc: Exception) -> str:
             return "output_is_input"
 
     if name == "LlmError":
+        if "not configured" in message and "llm endpoint url" in message:
+            return "missing_llm_url"
+        if "not configured" in message and "llm model" in message:
+            return "missing_llm_model"
         if "timed out" in message:
             return "llm_timeout"
         if "http is not allowed" in message or "https" in message:

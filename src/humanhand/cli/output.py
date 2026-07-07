@@ -36,8 +36,8 @@ def _color_enabled(no_color_flag: bool = False) -> bool:
         return False
     if sys.platform == "win32":
         # Only enable if the terminal looks ANSI-capable
-        term = os.getenv("TERM", "")
-        if "xterm" not in term and "ansi" not in term.lower():
+        term = os.getenv("TERM", "").lower()
+        if "xterm" not in term and "ansi" not in term:
             return False
     return sys.stdout.isatty() if hasattr(sys.stdout, "isatty") else False
 
@@ -102,7 +102,7 @@ def render_health(
             "version": __version__,
             "python_version": sys.version,
             "platform": sys.platform,
-            "llm_configured": config.llm_base_url is not None,
+            "llm_configured": config.llm_base_url is not None and config.llm_model is not None,
             "detector_provider": config.detector_provider,
             "cache_enabled": config.cache_enabled,
             "cache_dir": str(config.cache_dir),
@@ -120,7 +120,10 @@ def render_health(
         }
         print(json.dumps(result))
     else:
-        print(green("health: ok", no_color))
+        if config_valid:
+            print(green("health: ok", no_color))
+        else:
+            print(yellow("health: configuration is invalid", no_color))
 
 
 def render_rewrite_result(
