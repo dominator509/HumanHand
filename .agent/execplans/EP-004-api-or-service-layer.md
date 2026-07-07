@@ -1,10 +1,10 @@
 ---
 id: EP-004
 title: API or Service Layer
-status: not_started
+status: completed
 owner: agent
 created: 2026-07-05
-updated: 2026-07-05
+updated: 2026-07-06
 ---
 
 # EP-004: API or Service Layer
@@ -152,20 +152,40 @@ If commands already exist, preserve names and flags unless spec requires correct
 
 ## Progress
 
-- [ ] M1 — Define application services and ports.
-- [ ] M2 — Implement OpenAI-compatible LLM client.
-- [ ] M3 — Implement detector clients and local fallback.
-- [ ] M4 — Implement CLI commands.
-- [ ] M5 — Full service-layer verification.
+- [x] M1 — Define application services and ports.
+- [x] M2 — Implement OpenAI-compatible LLM client.
+- [x] M3 — Implement detector clients and local fallback.
+- [x] M4 — Implement CLI commands.
+- [x] M5 — Full service-layer verification.
 
 ## Surprises & Discoveries
 
-- None yet.
+- Typer command function names become CLI command names unless explicitly overridden with `@app.command(name="...")`. Renamed functions with `_cmd` suffix required explicit `name=` parameters to avoid colliding with imported service functions (`health`, `rewrite`, `verify`, etc.).
+- The first EP-004 completion left a regression where the local detector's insufficient-text payload used a freeform `"error"` string inside `raw_score_json`. The detector-score cache correctly rejected that payload as unsafe text-shaped data, which meant `verify` could fail on short text when caching was enabled.
+- The first EP-004 completion also left the rewrite repair loop in a fail-open state: `RepairDecision.FAIL` was treated like `ACCEPT`, and the repair-budget counter was off by one, so a drifted candidate could still be written after the budget was exhausted.
+- The first EP-004 completion also left the CLI observability contract incomplete: command loggers were still no-op stubs, so stderr JSONL events were not being emitted even though the service layer already shaped log fields and the spec required them.
+- LLM client uses `httpx` directly rather than the `openai` SDK for fine-grained retry/timeout control and to avoid SDK-level logging of request bodies.
+- Detector stubs for paid providers raise `ProviderUnavailableError` since API documentation is not available; this is safe and expected per the spec.
 
 ## Decision Log
 
 - 2026-07-05: Treat CLI commands as the external API contract. Reason: product is CLI-only. Consequence: SPEC-003 tests CLI/service behavior instead of HTTP routes.
+- 2026-07-06: Use `httpx` directly instead of the `openai` SDK for LLM calls. Reason: fine-grained control over retries, timeouts, error handling, and privacy (no SDK-level body logging). Consequence: response schema validation is done manually; the openai SDK remains in pyproject.toml but is not imported by LLM client code.
+- 2026-07-06: Detector provider stubs (gptzero, originality, copyleaks, winston, turnitin) raise `ProviderUnavailableError` because API documentation is unavailable. Reason: per EP-004 and SECURITY.md, do not invent undocumented endpoints. Consequence: only the local heuristic detector works without API docs; paid providers can be implemented later when documentation is available.
+- 2026-07-06: CLI health command was kept with its original `health` command name using explicit `@app.command(name="health")`. The function was renamed to `health_cmd` to avoid collision with the imported `health()` service function.
+- 2026-07-06: M2 and M3 were implemented in parallel using background subagents, reducing wall-clock time. Each agent independently validated its own milestone before handing back.
+- 2026-07-06: Codex audit changed the local detector insufficient-text payload from a freeform diagnostic string to a compact `status_code` record. Reason: EP-003 cache privacy rules reject text-shaped `raw_score_json`, and `verify` must remain safe with cache enabled. Consequence: short-text local-verifier results now cache cleanly without weakening the cache validator.
+- 2026-07-06: Codex audit introduced `RewriteQualityError` and made `rewrite()` fail closed when repair is exhausted. Reason: SPEC-003 lists fact-drift repair failure as a required error state, and the prior loop could still write drifted output. Consequence: rewrite failures now surface as CLI schema errors instead of silently emitting bad files.
+- 2026-07-06: Codex audit replaced the CLI's no-op logger with structured stderr JSONL logging and expanded `health --json` to report config validity and local command/config context. Reason: OBSERVABILITY.md and SPEC-003 require stderr JSONL events and a richer local health surface. Consequence: command contracts now emit parseable logs on success/error paths, and health JSON exposes config/cache/platform/command availability without calling the network.
+- 2026-07-06: `.agent/state/continuation.md` was updated during the audit even though it was not in the original Files to Change list. Reason: the user explicitly requested state-file updates between ExecPlans. Consequence: the Claude handoff state now reflects the audited, verified EP-004 result.
 
 ## Outcomes & Retrospective
 
-Not started.
+EP-004 is complete with all 5 milestones validated and a Codex audit pass applied. Key outcomes:
+
+- **Application services**: `rewrite`, `verify`, `diff_facts_service`, `scrub_service`, `health` orchestrate use cases through protocol-based dependency injection, keeping the application layer free of concrete infra imports.
+- **LLM client**: `OpenAiLlmClient` wraps httpx with HTTPS enforcement, 3x retry on 5xx/network errors, no retry on 4xx, schema validation, and privacy-safe error messages.
+- **Detector clients**: `LocalDetector` provides deterministic heuristic scoring (bigram repetition, sentence variance, personal pronouns, AI phrases, word length). Five provider stubs raise clear `ProviderUnavailableError` messages. Factory function `create_detector()` maps provider names to implementations.
+- **CLI commands**: All 5 required commands (`rewrite`, `verify`, `diff-facts`, `scrub`, `health`) are implemented with `--json`, `--print`, `--no-color` flags, stdout/stderr separation, and stable exit codes.
+- **Audit hardening**: rewrite now stops before writing when fact-preservation repair fails, short-text local-detector outputs stay compatible with the text-free cache contract, and CLI commands emit parseable stderr JSONL logs with richer `health --json` diagnostics.
+- **Test coverage**: 121 unit, 92 integration, 45 E2E, and 16 smoke tests pass. All mocked/local paths work. No live network calls in default tests.

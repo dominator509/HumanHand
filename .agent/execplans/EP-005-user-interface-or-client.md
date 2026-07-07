@@ -1,10 +1,10 @@
 ---
 id: EP-005
 title: User Interface or Client
-status: not_started
+status: completed
 owner: agent
 created: 2026-07-05
-updated: 2026-07-05
+updated: 2026-07-06
 ---
 
 # EP-005: User Interface or Client
@@ -141,20 +141,31 @@ If CLI helpers already exist, extend them rather than duplicate renderers. Prefe
 
 ## Progress
 
-- [ ] M1 — Implement JSON and text renderers.
-- [ ] M2 — Implement color/no-color and accessibility behavior.
-- [ ] M3 — Polish empty/error states.
-- [ ] M4 — Update smoke and docs.
-- [ ] M5 — Full CLI UX verification.
+- [x] M1 — Implement JSON and text renderers.
+- [x] M2 — Implement color/no-color and accessibility behavior.
+- [x] M3 — Polish empty/error states.
+- [x] M4 — Update smoke and docs.
+- [x] M5 — Full CLI UX verification.
 
 ## Surprises & Discoveries
 
-- None yet.
+- Typer's CliRunner uses a non-TTY stdout, so ANSI color codes are naturally suppressed in tests even without `--no-color`. Color tests validate structural acceptance (flag/env var accepted) rather than ANSI presence/absence in CliRunner output.
+- The `NO_COLOR` env var is checked by the output renderers but must also be checkable at the CLI level. Added to `_color_enabled()` in output.py which is called by all color helper functions.
+- Smoke test count went from 16 to 21 — all well within the 30-second target (2.54s).
 
 ## Decision Log
 
 - 2026-07-05: Treat CLI as nearest equivalent client/UI layer. Reason: project has no GUI/web/TUI. Consequence: accessibility requirements are CLI-focused.
+- 2026-07-06: Default color to off on Windows unless ANSI-capable terminal detected. Reason: Windows console host does not support ANSI by default. Consequence: color is conservative by default; users with Windows Terminal or ConEmu may need to set `TERM=xterm-256color` to get color output.
+- 2026-07-06: Created `cli/errors.py` as a centralized error message catalog. Reason: consistent, screen-reader-friendly, one-line error messages across all commands. Consequence: adding new error states requires updating the catalog; tests can reference catalog keys.
+- 2026-07-06: Fan-out strategy for EP-005: core code changes (M1-M3) done inline, E2E tests and docs/smoke done in parallel subagents. Reason: maximized parallelism for the iterative test-writing and doc-update phases while keeping tight control on the small core changes.
 
 ## Outcomes & Retrospective
 
-Not started.
+EP-005 is complete with all 5 milestones validated. Key outcomes:
+
+- **Color/accessibility**: `--no-color` flag and `NO_COLOR` env var honored across all commands. Color helpers (`bold`, `red`, `green`, `yellow`, `dim`) available for all renderers. Windows-conservative default (color off unless ANSI terminal detected).
+- **JSON mode**: All 5 commands produce valid JSON with stable schemas in `--json` mode. JSON error shape is `{"status": "error", "message": "...", "exit_code": N}`. No extra text on stdout in JSON mode.
+- **Error polish**: Centralized error catalog with 25 message keys. All common failure modes (empty input, missing file, BOM, unknown provider, config error) produce clear one-line messages. No stack traces or system paths in error output.
+- **Documentation**: README.md updated with Quick Start, full command reference, output modes documentation, and JSON examples.
+- **Test coverage**: 121 unit, 91 integration, 137 E2E, and 21 smoke tests all pass. `verify.sh` exits 0.
