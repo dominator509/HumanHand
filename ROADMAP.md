@@ -17,6 +17,13 @@ This roadmap sequences Human Hand from repository discovery to production readin
 | Phase 8: Deployment and release | Prepare packaging, wheel install, release workflow, changelog, docs, rollback path. | Phase 7 complete. | Wheel installs in clean env; release workflow is manual; post-install smoke passes. | SPEC-008 | EP-009 |
 | Phase 9: Production readiness | Final verification, security/privacy/performance/docs review, rollback drill, launch gate. | Phases 0-8 complete. | `sh scripts/verify.sh`, `sh scripts/production-readiness-check.sh`, and `sh scripts/loop.sh` pass; remaining risks documented. | SPEC-008 | EP-010 |
 
+| Phase 10: Pre-SLM program contract | Establish the program, ADRs, specifications, clean-room boundaries, and future plan sequence. | EP-010 complete and user-approved blueprint. | EP-011 complete; no SLM implementation exists; EP-012 is the next plan. | SPEC-009 through SPEC-017 | EP-011 |
+| Phase 11: Pre-SLM deterministic workflow | Implement canonical import, style evidence, project/fact state, privacy/export, lexical review, Beacon, and integration in order. | EP-011 through EP-018 complete. | EP-019 readiness gate passes with explicit remaining risks and no SLM runtime. | SPEC-009 through SPEC-017 | EP-012 through EP-019 |
+
 ## Production Readiness Milestone
 
-Production readiness is reached only when all ExecPlans EP-000 through EP-010 are complete, all specs are satisfied, all scripts required by `COMMANDS.md` pass, packaging artifacts are verified, release and rollback docs are complete, and a final Decision Log entry records the launch gate result.
+The EP-010 compatibility readiness gate remains valid for local package use. The
+Pre-SLM release gate is reached only when EP-011 through EP-019 are complete and
+audited, all new scripts and specs pass, public artifacts are independently audited,
+backward compatibility remains green, and a final Decision Log entry records the
+launch gate without claiming SLM readiness or publication.

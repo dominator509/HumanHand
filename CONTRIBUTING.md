@@ -84,3 +84,10 @@ This blueprint does not require a specific commit format. Commits should be smal
 - Update ExecPlan progress as work proceeds.
 - Write `.agent/state/last-result.env` as final file operation.
 - Final response must include changed files, commands/results, decisions, risks, and acceptance status.
+
+## Pre-SLM Contributions
+
+Pre-SLM work follows EP-011 through EP-019 in order. Add or update a specification and
+ADR before introducing a new persistence, privacy, parser, exporter, research, or
+lexical contract. Keep source/style lanes separate, keep the public artifact boundary
+clean, and do not add any model/training/runtime path before the final gate.

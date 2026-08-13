@@ -16,6 +16,6 @@ if [ ! -f pyproject.toml ]; then
   exit 1
 fi
 
-uv run python -m build --no-isolation
+sh scripts/uv.sh run python -m build --no-isolation
 
 echo "build: ok"

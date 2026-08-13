@@ -67,3 +67,16 @@ Initial decisions are recorded in the table above. When implementation creates a
 ## ADR Template Reference
 
 Use `.agent/templates/adr-template.md`.
+
+## Pre-SLM ADR Index
+
+The user-approved Pre-SLM architecture is recorded in:
+
+- [ADR-001](.agent/adrs/ADR-001-persistent-local-project-state.md): selected local project state.
+- [ADR-002](.agent/adrs/ADR-002-dual-clean-room-ingress-and-public-artifact-egress.md): dual ingress and public egress.
+- [ADR-003](.agent/adrs/ADR-003-style-evidence-multi-representation-vault.md): exact style evidence.
+- [ADR-004](.agent/adrs/ADR-004-controlled-parser-worker-processes.md): bounded parser workers.
+- [ADR-005](.agent/adrs/ADR-005-application-layer-encryption-and-key-providers.md): encryption/key providers.
+- [ADR-006](.agent/adrs/ADR-006-research-beacon-policy-firewall.md): Beacon policy firewall.
+- [ADR-007](.agent/adrs/ADR-007-deterministic-lexical-normalization.md): lexical finalization.
+- [ADR-008](.agent/adrs/ADR-008-slm-deferred-and-future-writer-contract.md): SLM deferred boundary.

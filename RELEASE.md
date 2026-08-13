@@ -102,3 +102,9 @@ There is no hosted monitoring. Maintainers monitor:
 - Security reports.
 - User-reported install/runtime failures.
 - PyPI package integrity and metadata.
+
+## Pre-SLM Release Boundary
+
+Pre-SLM readiness is a local deterministic release gate and does not authorize model
+training, model download, PyPI publication, release tagging, or hosted deployment.
+Review the program manifest and EP-019 report before any later SLM decision.

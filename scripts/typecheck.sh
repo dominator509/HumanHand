@@ -21,6 +21,6 @@ if [ ! -d src ]; then
   exit 1
 fi
 
-uv run mypy src tests
+sh scripts/uv.sh run mypy src tests
 
 echo "typecheck: ok"

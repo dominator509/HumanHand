@@ -28,6 +28,6 @@ sh scripts/build.sh
 sh scripts/security-check.sh
 sh scripts/dependency-audit.sh
 sh scripts/smoke-test.sh
-uv run pytest tests -m "not live and not live_e2e" --cov=src/humanhand --cov-branch --cov-report=term-missing:skip-covered --basetemp="$PYTEST_BASETEMP" -o cache_dir="$PYTEST_CACHE_DIR"
+sh scripts/uv.sh run pytest tests -m "not live and not live_e2e" --cov=src/humanhand --cov-branch --cov-report=term-missing:skip-covered --basetemp="$PYTEST_BASETEMP" -o cache_dir="$PYTEST_CACHE_DIR"
 
 echo "verify: ok"

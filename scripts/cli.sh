@@ -11,4 +11,4 @@ TEMP="${TEMP:-$TMPDIR}"
 export UV_CACHE_DIR TMPDIR TMP TEMP
 mkdir -p "$UV_CACHE_DIR" "$TMPDIR"
 
-exec uv run humanhand "$@"
+exec sh scripts/uv.sh run humanhand "$@"

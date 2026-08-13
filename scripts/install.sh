@@ -16,6 +16,6 @@ if [ ! -f pyproject.toml ]; then
   exit 1
 fi
 
-uv sync --all-extras --dev
+sh scripts/uv.sh sync --all-extras --dev
 
 echo "install: ok"

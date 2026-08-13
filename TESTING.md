@@ -141,3 +141,11 @@ Each feature must include:
 ## Definition of Test Done
 
 Testing is done for an ExecPlan when all required tests pass, new behavior has regression coverage, tests do not rely on live network unless gated, coverage requirements for the phase are met, and no test fixture/log/cache contains user text or secrets.
+
+## Pre-SLM Test Boundary
+
+The Pre-SLM test pyramid adds deterministic replay, source/style lane isolation,
+malicious-container and parser-limit fixtures, authorship review, protected-span and
+revision checks, public-artifact package audits, privacy-mode tests, lexical ambiguity
+no-op tests, and Beacon policy-firewall tests. All new live research or scanner calls
+remain explicitly gated; synthetic/public fixtures are required by default.

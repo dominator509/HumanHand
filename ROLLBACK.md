@@ -77,3 +77,9 @@ For security/privacy/fact-drift rollback, add:
 - Regression tests added.
 - Process changes.
 - Linked ExecPlan or ADR.
+
+## Pre-SLM Rollback Boundary
+
+Pre-SLM project migrations, retained originals, exports, and policy changes must have
+an explicit rollback path. Never delete user project data or mutate immutable evidence
+as part of rollback; use the selected project's documented migration/retention tools.

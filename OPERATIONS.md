@@ -104,3 +104,10 @@ Not applicable for hosted operations. For releases, use manual release windows c
 - Never run live tests with user text.
 - Never publish artifacts before production readiness and maintainer approval.
 - Never delete user files as part of support guidance except optional cache deletion.
+
+## Pre-SLM Operations
+
+Operate only on the user-selected project directory and explicit retention policy.
+Obsidian projections are user-triggered and non-authoritative. Beacon observations are
+read-only until a human approves a quarantined proposal; no automatic merge, publish,
+deploy, detector loop, or private-document upload is permitted.

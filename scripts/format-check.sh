@@ -16,6 +16,6 @@ if [ ! -f pyproject.toml ]; then
   exit 1
 fi
 
-uv run ruff format --check .
+sh scripts/uv.sh run ruff format --check .
 
 echo "format check: ok"

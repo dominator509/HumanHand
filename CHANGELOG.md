@@ -32,3 +32,11 @@ All notable changes to Human Hand are documented in this file.
 - Deployment preparation: build config hardening, release workflow steps in DEPLOYMENT.md, documentation baseline complete.
 - Console-script smoke validation via `uv run humanhand` for `--version`, `--help`, `health`, `verify`, `diff-facts`, and `scrub`.
 - `pyproject.toml` metadata: Python classifiers, keywords, project URLs.
+
+## 2026-08-12 - Pre-SLM Bootstrap
+
+- Added the user-supplied Pre-SLM implementation blueprint and resumable bootstrap prompt.
+- Added the Pre-SLM program manifest, ADRs, specifications, ordered ExecPlans, and
+  documentation-only future SLM handoff contract.
+- Kept SLM training/runtime, model downloads, detector optimization, and publication out
+  of scope; EP-011 is the active control-plane plan.

@@ -103,3 +103,10 @@ For local production readiness:
 - Redaction tests prove no user text or secrets appear.
 - Health command works without secrets or network.
 - No remote telemetry code exists.
+
+## Pre-SLM Observability Boundary
+
+New import, project, export, lexical, and Beacon reports must be versioned and redact
+user text. Strict-local mode uses `NullLogger`; public artifacts never embed private
+receipts, model fields, project ids, prompts, or research reports. Live Beacon calls are
+explicitly gated and their payloads are sanitized.

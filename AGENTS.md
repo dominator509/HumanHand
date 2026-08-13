@@ -65,6 +65,15 @@ For every implementation session:
 15. Write `.agent/state/last-result.env` as the final file operation of the session.
 16. Provide the required final response.
 
+## 3A. Pre-SLM Program Extension
+
+When `.agent/programs/PRE-SLM-HARDENING-PROGRAM.md` exists, the first incomplete plan
+from EP-011 through EP-019 becomes the implementation seam after the existing EP-010
+baseline. Read the supplied blueprint and bootstrap prompt when the active plan lists
+them, preserve the current five CLI commands, and stop before any SLM training,
+download, runtime, or semantic-repair implementation. `SLM_HANDOFF_CONTRACT.md` is
+documentation-only and does not authorize model code.
+
 ## 4. STOP Conditions
 
 Stop only when one of these applies:

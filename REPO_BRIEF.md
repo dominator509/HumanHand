@@ -14,14 +14,20 @@ tags:
 
 ## Purpose
 
-Human Hand is a Windows-first Python 3.11 CLI built one ExecPlan at a time from the control plane in `.agent/`. Today the repository is still primarily a blueprint/control repo, so the fastest durable orientation surface is the authority stack plus the current handoff loop.
+Human Hand is a Windows-first Python 3.11 CLI with a completed EP-010 compatibility
+baseline and an active Pre-SLM hardening program. Work remains ExecPlan-driven from
+`.agent/`; the fastest durable orientation surface is this note plus the active plan
+and handoff state.
 
 ## Start Here
 
 - Authority stack: [AGENTS.md](AGENTS.md), [COMMANDS.md](COMMANDS.md), [.agent/PLANS.md](.agent/PLANS.md), [.agent/EXECUTION_RULES.md](.agent/EXECUTION_RULES.md)
 - Product context: [PROJECT_BRIEF.md](PROJECT_BRIEF.md), [ARCHITECTURE.md](ARCHITECTURE.md), [ENVIRONMENT.md](ENVIRONMENT.md), [TESTING.md](TESTING.md)
-- Current implementation seam: first incomplete ExecPlan under [.agent/execplans/](.agent/execplans/)
-- Current foundation plan: [.agent/execplans/EP-001-foundation.md](.agent/execplans/EP-001-foundation.md)
+- Current program: [.agent/programs/PRE-SLM-HARDENING-PROGRAM.md](.agent/programs/PRE-SLM-HARDENING-PROGRAM.md)
+- Current implementation seam: [.agent/execplans/EP-011-pre-slm-program-contract.md](.agent/execplans/EP-011-pre-slm-program-contract.md)
+- Blueprint: [HumanHand_PreSLM_Implementation_Blueprint.md](HumanHand_PreSLM_Implementation_Blueprint.md)
+- Bootstrap prompt: [CODEX_BOOTSTRAP_PROMPT_HUMANHAND_PRE_SLM.md](CODEX_BOOTSTRAP_PROMPT_HUMANHAND_PRE_SLM.md)
+- Future writer boundary: [SLM_HANDOFF_CONTRACT.md](SLM_HANDOFF_CONTRACT.md)
 
 ## Claude To Codex Loop
 
@@ -55,6 +61,15 @@ Human Hand is a Windows-first Python 3.11 CLI built one ExecPlan at a time from 
 - Serena should treat this as a Python-first repo with docs and shell support, not as a bash-only project.
 - Use this file as the top-level orientation note, then read the active ExecPlan and only the linked authority docs.
 - Keep Serena quiet and additive: durable notes belong in memories and repo docs, not in broad workspace churn.
+
+## Pre-SLM Boundary
+
+- Source and human-style documents use separate clean-room lanes.
+- Immutable originals, canonical evidence, internal working state, and public artifacts
+  are separate channels.
+- Strict-local, private-audited, and regulated privacy modes are planned through EP-019.
+- Obsidian is an optional user-triggered projection, never the authoritative project store.
+- No model training, download, runtime, or detector-score optimization is in scope.
 
 ## Obsidian Notes
 

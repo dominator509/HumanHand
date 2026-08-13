@@ -72,3 +72,12 @@ The primary risk is not building a text transformer. The primary risk is buildin
 ## Production Readiness Definition
 
 Production readiness means all ExecPlans EP-000 through EP-010 are complete, all linked specs are satisfied, `scripts/verify.sh` exits 0, `scripts/production-readiness-check.sh` exits 0, `scripts/loop.sh` prints `build: complete`, packaging artifacts install cleanly, post-install smoke tests pass, security/privacy gates pass, rollback instructions are documented, and all remaining risks are either resolved or explicitly accepted in the active ExecPlan and release notes.
+
+## Pre-SLM Expansion
+
+EP-011 through EP-019 extend the completed compatibility baseline without adding a
+specialized local model. The expansion introduces separate source/style clean-room
+imports, exact style evidence, protected facts and project state, deterministic context
+capsules, privacy modes, clean-room public exporters, conservative lexical review, and
+a human-approved research Beacon. SLM training, model download, inference runtime, and
+semantic repair remain outside this repository until a later explicitly approved program.

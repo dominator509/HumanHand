@@ -22,6 +22,6 @@ if [ ! -d tests/integration ]; then
   exit 1
 fi
 
-uv run pytest tests/integration -m "not live and not live_e2e" --basetemp="$PYTEST_BASETEMP" -o cache_dir="$PYTEST_CACHE_DIR"
+sh scripts/uv.sh run pytest tests/integration -m "not live and not live_e2e" --basetemp="$PYTEST_BASETEMP" -o cache_dir="$PYTEST_CACHE_DIR"
 
 echo "integration tests: ok"

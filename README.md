@@ -280,3 +280,18 @@ The default local coding loop is:
 ## Git And GitHub
 
 This repository is intended to work cleanly with local Git plus a GitHub remote named `origin`, so Codex sidebar commit/push actions have a normal repository to operate on. Local-only tool state such as caches, transient agent state, and workspace-specific Obsidian/Serena files is excluded via `.gitignore`.
+
+## Pre-SLM Program
+
+The existing `health`, `rewrite`, `verify`, `diff-facts`, and `scrub` commands remain
+the compatibility baseline. The active Pre-SLM program is documented in
+[PRE-SLM-HARDENING-PROGRAM.md](.agent/programs/PRE-SLM-HARDENING-PROGRAM.md) and starts
+at [EP-011](.agent/execplans/EP-011-pre-slm-program-contract.md). Its goal is to add
+deterministic source/style clean-room import, exact style evidence, protected facts,
+local project state, privacy modes, public artifact auditing, lexical review, and a
+human-approved research Beacon before any SLM is considered.
+
+Read [REPO_BRIEF.md](REPO_BRIEF.md) for the compact Claude/Codex/Serena/Obsidian
+orientation. The supplied [implementation blueprint](HumanHand_PreSLM_Implementation_Blueprint.md)
+and [bootstrap prompt](CODEX_BOOTSTRAP_PROMPT_HUMANHAND_PRE_SLM.md) are design/control
+documents, not permission to add model or training code.

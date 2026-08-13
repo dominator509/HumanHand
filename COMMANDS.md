@@ -15,6 +15,7 @@ Use `uv` for development. End users install the built wheel with `pip`. Do not r
 | Purpose | Command | Expected Success Output |
 |---|---|---|
 | Preflight | `sh scripts/preflight.sh` | `preflight: ok` |
+| Windows uv resolver | `sh scripts/uv.sh --version` | uv version text |
 | Install dependencies | `sh scripts/install.sh` | `install: ok` |
 | Lint | `sh scripts/lint.sh` | `lint: ok` |
 | Format check | `sh scripts/format-check.sh` | `format check: ok` |
@@ -72,6 +73,21 @@ Use `uv` for development. End users install the built wheel with `pip`. Do not r
 | Live LLM E2E | `HUMANHAND_RUN_LIVE_E2E=1 sh scripts/test-e2e.sh` | Requires explicit user-provided endpoint/model/key or local compatible server. |
 | Insecure local HTTP endpoint | `HUMANHAND_ALLOW_INSECURE=1 ...` | Allowed only for local development endpoints such as localhost. |
 | Detector live E2E | `HUMANHAND_RUN_LIVE_E2E=1 HUMANHAND_DETECTOR_PROVIDER=<provider> ...` | Requires explicit provider key and account. |
+
+## Planned Pre-SLM Commands
+
+The following command families are specified but unavailable until their corresponding
+ExecPlan implements and tests them. Do not invoke them early or treat this list as
+evidence that the commands already exist:
+
+- `import`, `style`, `project`, `context`, `finalize`, `export`, `audit`, `privacy`,
+  `beacon`, and `scanner`.
+- Focused validation scripts listed in the Pre-SLM blueprint are registered only when
+  the implementing plan creates them.
+
+All canonical scripts resolve the development tool through `sh scripts/uv.sh`, which
+supports native `uv` and the Windows `uv.cmd` shim without changing the documented
+underlying command strings.
 
 ## Forbidden Commands
 

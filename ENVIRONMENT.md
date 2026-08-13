@@ -87,3 +87,14 @@ Config loading must validate env vars at command startup and fail before reading
 - If scripts fail with `pyproject.toml not found`, execute EP-001 foundation.
 - If live calls fail for missing keys, either configure the endpoint/key/model or use local mocked/fallback tests.
 - If HTTP localhost endpoints are rejected, set `HUMANHAND_ALLOW_INSECURE=1` only for local development.
+
+## Pre-SLM Environment Boundary
+
+Pre-SLM project policy belongs in a user-selected `.humanhand/project.toml`; secrets
+remain environment variables or ignored local files. Proposed Pre-SLM variables are
+not active until their implementing specification and tests define them. Research and
+scanner network calls remain disabled unless an explicit plan, provider contract, and
+live-test gate enable them.
+
+On Windows Git Bash, canonical scripts use `sh scripts/uv.sh` so an installed `uv.cmd`
+shim is resolved without changing the documented command surface.

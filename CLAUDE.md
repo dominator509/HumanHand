@@ -52,7 +52,7 @@ When the user requests a full build loop, execute ExecPlans in order starting fr
 - Examples:
   - `rtk sh scripts/preflight.sh`
   - `rtk sh scripts/verify.sh`
-  - `rtk uv run humanhand --help`
+  - `rtk sh scripts/cli.sh --help`
   - `rtk git diff --name-only`
 - For Windows builtins, use `rtk proxy cmd /c ...`.
 - Examples:
@@ -73,7 +73,9 @@ When the user requests a full build loop, execute ExecPlans in order starting fr
 
 1. Confirm repository files are present. If only the blueprint zip is present, extract it before repo rules apply.
 2. Read the authority files in the repo order.
-3. Activate the current ExecPlan and read its Files to Read First.
+3. If `.agent/programs/PRE-SLM-HARDENING-PROGRAM.md` exists, select the lowest-numbered
+   incomplete plan from EP-011 through EP-019; otherwise activate the current plan.
+   Read that plan's Files to Read First.
 4. Run `rtk sh scripts/preflight.sh`.
 5. Execute only one ExecPlan in this session, unless the current user instruction explicitly changes the loop.
 
@@ -96,6 +98,10 @@ Use RTK for external commands and `rtk proxy cmd /c` for Windows builtins.
 
 Execute exactly one ExecPlan, validate every milestone, update the active ExecPlan, write `.agent/state/last-result.env` as the final file operation, and then pause for the Codex audit/fix pass before the next ExecPlan.
 ```
+
+For the Pre-SLM program, read the supplied blueprint and bootstrap prompt only when
+EP-011 requires them; do not paste either large document into recurring prompts. Do not
+create any SLM, training, model, or semantic-repair implementation path.
 
 ## Ready-To-Paste Codex Audit Prompt
 

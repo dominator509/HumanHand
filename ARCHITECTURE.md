@@ -6,9 +6,14 @@ This document defines the intended architecture for Human Hand and the concrete 
 
 ## System Overview
 
-Human Hand is a single-process Python 3.11 CLI. It reads source text and style sample text, builds a style-and-fact-preserving rewrite request, optionally calls a configured OpenAI-compatible LLM endpoint, scrubs metadata, writes byte-clean UTF-8 output, and provides verification commands for detector scoring, fact drift, and metadata cleanliness.
+Human Hand retains a single-process Python 3.11 compatibility CLI for the existing
+rewrite workflow. The Pre-SLM program adds deterministic clean-room import, evidence,
+project, export, and review boundaries around that compatibility surface. A future
+model is explicitly deferred until those boundaries are complete.
 
-There is no web server, no GUI, no TUI, no authentication, no cloud database, no background worker, no telemetry, and no remote metrics.
+There is no web server, GUI, TUI, authentication system, hosted database, telemetry,
+or remote metrics. Short-lived bounded parser workers and a user-selected local project
+store are allowed by the Pre-SLM ADRs; there is still no daemon or hidden global history.
 
 ## Intended Repository Map
 
@@ -130,8 +135,13 @@ There is no web server, no GUI, no TUI, no authentication, no cloud database, no
 
 ## Persistence Boundaries
 
-- No primary database.
-- Optional SQLite cache may store only detector score records: text hash, provider, model, schema version, score fields, timestamp, cache metadata, and compact raw provider score data that contains no user text.
+- The EP-010 compatibility layer has only an optional SQLite detector-score cache.
+- The Pre-SLM layer may add a user-selected `.humanhand/` project database with versioned
+  migrations, encrypted sensitive fields, revisions, evidence, and approvals.
+- Neither cache nor project schema may store secrets or hidden global document history.
+- The compatibility cache may store only detector score records: text hash, provider,
+  model, schema version, score fields, timestamp, cache metadata, and compact raw
+  provider score data that contains no user text.
 - Cache schema must include a schema version and be backward-compatible where practical.
 - Cache file should be `0600` where supported.
 - No migration framework is required; cache schema creation/update is lazy and safe.
@@ -188,7 +198,9 @@ There is no web server, no GUI, no TUI, no authentication, no cloud database, no
 
 ## Forbidden Changes
 
-- Adding a web server, HTTP API, GUI, TUI, background worker, auth system, cloud database, telemetry, remote metrics, or hosted deployment.
+- Adding a web server, HTTP API, GUI, TUI, daemon, auth system, hosted database,
+  telemetry, remote metrics, or hosted deployment. A bounded parser child process and
+  user-selected local project store are allowed only under the Pre-SLM ADRs.
 - Persisting source/style/output text except requested output file.
 - Logging prompts or model responses.
 - Auto-submitting to academic/professional platforms.
@@ -246,3 +258,17 @@ Only the optional detector-score cache has a schema.
 - Are tests present at the right layer?
 - Are non-goals preserved?
 - Is any extra changed file justified?
+
+## Pre-SLM Document Channels
+
+The extended workflow keeps four distinct channels:
+
+1. Immutable original bytes, retained only under explicit policy.
+2. Canonical evidence with exact spans, structure, metadata inventory, and findings.
+3. Internal working documents with project revisions, claims, approvals, and style
+   constraints.
+4. Approved public artifacts created by clean-room exporters and checked independently.
+
+Source and style imports remain separate lanes. Unknown authorship, unsupported
+features, ambiguous reading order, unsafe metadata, and unresolved revisions fail
+closed or require human review. Obsidian is an optional projection, not an authority.

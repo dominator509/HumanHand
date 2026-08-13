@@ -23,6 +23,6 @@ if [ ! -d tests/unit ]; then
   exit 1
 fi
 
-uv run pytest tests/unit -m "not live and not live_e2e" --basetemp="$PYTEST_BASETEMP" -o cache_dir="$PYTEST_CACHE_DIR"
+sh scripts/uv.sh run pytest tests/unit -m "not live and not live_e2e" --basetemp="$PYTEST_BASETEMP" -o cache_dir="$PYTEST_CACHE_DIR"
 
 echo "unit tests: ok"

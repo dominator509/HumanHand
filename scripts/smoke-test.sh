@@ -54,7 +54,7 @@ sh scripts/cli.sh verify "$verify_file" --json >/dev/null
 sh scripts/cli.sh diff-facts "$source_file" "$candidate_file" --json >/dev/null
 sh scripts/cli.sh scrub "$audit_file" --audit --json >/dev/null
 
-uv run pytest tests/smoke -m "not live and not live_e2e" --durations=5 --basetemp="$PYTEST_BASETEMP" -o cache_dir="$PYTEST_CACHE_DIR"
+sh scripts/uv.sh run pytest tests/smoke -m "not live and not live_e2e" --durations=5 --basetemp="$PYTEST_BASETEMP" -o cache_dir="$PYTEST_CACHE_DIR"
 elapsed_seconds="$(( $(date +%s) - start_epoch ))"
 
 if [ "$elapsed_seconds" -ge 30 ]; then

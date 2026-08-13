@@ -150,3 +150,15 @@ Stop when:
 - A proposed change would store user text persistently outside the requested output file.
 - A proposed change would weaken redaction, endpoint validation, schema validation, or output scrub guarantees.
 - A production release/publish action is requested without explicit permission.
+
+## Pre-SLM Security Boundary
+
+The Pre-SLM workflow adds four-channel document separation, dual source/style import
+lanes, bounded parser workers, user-selected local project state, application-layer
+encryption ports, and a public-artifact boundary. Strict-local mode denies network,
+raw text logging, detector cache, and automatic Obsidian projection. The Research
+Beacon receives only public, synthetic, or sanitized context and cannot optimize
+detectors, destroy provenance, upload private documents, or merge/publish/deploy.
+
+No model, training stack, model weights, or local writer runtime is part of this
+program. Unsupported or ambiguous content must fail closed or require human review.

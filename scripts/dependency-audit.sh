@@ -17,6 +17,6 @@ if [ ! -f pyproject.toml ]; then
   exit 1
 fi
 
-uv run pip-audit
+sh scripts/uv.sh run pip-audit
 
 echo "dependency audit: ok"

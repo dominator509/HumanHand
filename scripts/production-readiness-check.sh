@@ -13,7 +13,7 @@ mkdir -p "$UV_CACHE_DIR" "$TMPDIR"
 
 sh scripts/verify.sh
 
-package_version="$(uv run python - <<'PY'
+package_version="$(sh scripts/uv.sh run python - <<'PY'
 import tomllib
 from pathlib import Path
 
@@ -57,7 +57,7 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
 venv_dir="$tmp_dir/install-venv"
-uv run python -m venv "$venv_dir"
+sh scripts/uv.sh run python -m venv "$venv_dir"
 
 if [ -x "$venv_dir/Scripts/python.exe" ]; then
   venv_python="$venv_dir/Scripts/python.exe"

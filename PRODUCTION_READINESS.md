@@ -142,3 +142,11 @@ EP-010 must record:
 - [x] README/CHANGELOG/release notes updated.
 - [x] Rollback drill documented.
 - [x] Final Decision Log entry added.
+
+## Pre-SLM Readiness
+
+The EP-010 checklist is the compatibility baseline. The separate Pre-SLM gate is not
+complete until EP-011 through EP-019 are audited, deterministic import/style/fact/
+privacy/export/lexical/Beacon checks pass, backward compatibility remains green, and
+no model or training implementation exists. License choice, publication, live service
+accounts, and deployment remain maintainer-owned decisions.

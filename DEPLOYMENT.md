@@ -94,3 +94,7 @@ Stop when:
 ## Production Verification
 
 Production verification is local artifact verification, not server monitoring. It requires passing validation scripts, clean wheel install, smoke tests, docs review, security/privacy review, release notes, rollback instructions, and signed-off launch gate in EP-010.
+
+Pre-SLM integration remains local-first and has no hosted deployment target. EP-019 may
+verify packaging and project migration locally, but it cannot publish, tag, deploy, or
+introduce an SLM runtime.
