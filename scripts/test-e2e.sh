@@ -25,7 +25,7 @@ fi
 if [ "${HUMANHAND_RUN_LIVE_E2E:-}" = "1" ]; then
   sh scripts/uv.sh run pytest tests/e2e --basetemp="$PYTEST_BASETEMP" -o cache_dir="$PYTEST_CACHE_DIR"
 else
-  sh scripts/uv.sh run pytest tests/e2e -m "not live and not live_e2e" --basetemp="$PYTEST_BASETEMP" -o cache_dir="$PYTEST_CACHE_DIR"
+  sh scripts/uv.sh run pytest tests/e2e -m "not live and not live_e2e and not importers" --basetemp="$PYTEST_BASETEMP" -o cache_dir="$PYTEST_CACHE_DIR"
 fi
 
 echo "e2e tests: ok"

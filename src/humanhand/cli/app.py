@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import sys
 import time
 from datetime import UTC, datetime
@@ -13,6 +14,7 @@ from typing import NoReturn
 import typer
 
 from humanhand import __version__
+from humanhand.application.ports import Logger
 from humanhand.application.services import (
     RewriteQualityError,
     diff_facts_service,
@@ -20,7 +22,13 @@ from humanhand.application.services import (
     scrub_service,
     verify,
 )
+from humanhand.cli.audit_commands import audit_app
+from humanhand.cli.beacon_commands import beacon_app
+from humanhand.cli.context_commands import context_app
 from humanhand.cli.errors import error_for_exception, get_error_message, message_for_exception
+from humanhand.cli.export_commands import export_app
+from humanhand.cli.finalization_commands import finalize_app
+from humanhand.cli.import_commands import import_app
 from humanhand.cli.output import (
     render_diff_facts_result,
     render_health,
@@ -28,6 +36,10 @@ from humanhand.cli.output import (
     render_scrub_result,
     render_verify_result,
 )
+from humanhand.cli.privacy_commands import privacy_app
+from humanhand.cli.project_commands import project_app
+from humanhand.cli.scanner_commands import scanner_app
+from humanhand.cli.style_commands import style_app
 from humanhand.infra.cache import DetectorScoreCache
 from humanhand.infra.config import Config, load_config
 from humanhand.infra.counters import Counters, emit_counters
@@ -37,12 +49,24 @@ from humanhand.infra.files import FileIOError, read_text_strict
 from humanhand.infra.http import HttpError, validate_endpoint
 from humanhand.infra.llm import LlmError, OpenAiLlmClient
 from humanhand.infra.logging import redact_value
+from humanhand.infra.privacy.null_logger import NullLogger
 
 app = typer.Typer(
     name="humanhand",
     help="Privacy-preserving CLI for rewriting AI-assisted text into human style.",
     no_args_is_help=True,
 )
+
+app.add_typer(import_app, name="import")
+app.add_typer(style_app, name="style")
+app.add_typer(project_app, name="project")
+app.add_typer(context_app, name="context")
+app.add_typer(privacy_app, name="privacy")
+app.add_typer(export_app, name="export")
+app.add_typer(audit_app, name="audit")
+app.add_typer(finalize_app, name="finalize")
+app.add_typer(beacon_app, name="beacon")
+app.add_typer(scanner_app, name="scanner")
 
 
 # ── Exit codes ──────────────────────────────────────────────────
@@ -153,6 +177,16 @@ class _CliLogger:
         print(json.dumps(payload, separators=(",", ":"), sort_keys=True), file=sys.stderr)
 
 
+def _privacy_aware_logger(
+    counters: Counters, privacy_mode: str | None = None
+) -> tuple[Logger, bool]:
+    """Return the configured logger and whether counter emission is permitted."""
+    mode = privacy_mode or os.getenv("HUMANHAND_PRIVACY_MODE") or "private_audited"
+    if mode.strip().lower() == "strict_local":
+        return NullLogger(), False
+    return _CliLogger(counters), True
+
+
 def _error_json(message: str, code: int) -> NoReturn:
     """Print a JSON error and exit."""
     print(json.dumps({"status": "error", "message": message, "exit_code": code}))
@@ -170,7 +204,7 @@ def _report_error(
     code: int,
     json_mode: bool,
     *,
-    logger: _CliLogger | None = None,
+    logger: Logger | None = None,
     event: str | None = None,
 ) -> NoReturn:
     """Dispatch error to JSON or text mode."""
@@ -287,7 +321,7 @@ def health_cmd(
     json_mode = _effective_flag(ctx, json_mode, "json_mode")
     no_color = _effective_flag(ctx, no_color, "no_color")
     counters = Counters()
-    logger = _CliLogger(counters)
+    logger, emit_metrics = _privacy_aware_logger(counters)
     started_at = time.monotonic()
     completed = False
     try:
@@ -302,9 +336,11 @@ def health_cmd(
             config_valid = False
             config_error = type(exc).__name__
 
+        logger, emit_metrics = _privacy_aware_logger(counters, config.privacy_mode)
+
         # Check cache dir writability (only meaningful when cache is enabled)
         cache_dir_writable: bool | None = None
-        if config.cache_enabled and config.cache_dir:
+        if config.privacy_mode != "strict_local" and config.cache_enabled and config.cache_dir:
             cache_path = Path(config.cache_dir)
             try:
                 cache_path.mkdir(parents=True, exist_ok=True)
@@ -343,7 +379,7 @@ def health_cmd(
         )
         completed = True
     finally:
-        if completed and counters:
+        if completed and counters and emit_metrics:
             emit_counters(counters)
 
 
@@ -385,7 +421,7 @@ def rewrite_cmd(
     json_mode = _effective_flag(ctx, json_mode, "json_mode")
     no_color = _effective_flag(ctx, no_color, "no_color")
     counters = Counters()
-    logger = _CliLogger(counters)
+    logger, emit_metrics = _privacy_aware_logger(counters)
     completed = False
     try:
         if json_mode and print_output:
@@ -402,6 +438,16 @@ def rewrite_cmd(
         except Exception as exc:
             _report_error(
                 message_for_exception(exc),
+                EXIT_CONFIG_ERROR,
+                json_mode,
+                logger=logger,
+                event="rewrite.error",
+            )
+
+        logger, emit_metrics = _privacy_aware_logger(counters, config.privacy_mode)
+        if config.privacy_mode == "strict_local":
+            _report_error(
+                "strict_local privacy mode forbids network-backed rewrite",
                 EXIT_CONFIG_ERROR,
                 json_mode,
                 logger=logger,
@@ -538,7 +584,7 @@ def rewrite_cmd(
         render_rewrite_result(result, json_mode=json_mode, no_color=no_color)
         completed = True
     finally:
-        if completed and counters:
+        if completed and counters and emit_metrics:
             emit_counters(counters)
 
 
@@ -569,7 +615,7 @@ def verify_cmd(
     json_mode = _effective_flag(ctx, json_mode, "json_mode")
     no_color = _effective_flag(ctx, no_color, "no_color")
     counters = Counters()
-    logger = _CliLogger(counters)
+    logger, emit_metrics = _privacy_aware_logger(counters)
     completed = False
     try:
         try:
@@ -577,6 +623,16 @@ def verify_cmd(
         except Exception as exc:
             _report_error(
                 message_for_exception(exc),
+                EXIT_CONFIG_ERROR,
+                json_mode,
+                logger=logger,
+                event="verify.error",
+            )
+
+        logger, emit_metrics = _privacy_aware_logger(counters, config.privacy_mode)
+        if config.privacy_mode == "strict_local" and provider != "local":
+            _report_error(
+                "strict_local privacy mode permits only the local detector",
                 EXIT_CONFIG_ERROR,
                 json_mode,
                 logger=logger,
@@ -609,7 +665,8 @@ def verify_cmd(
 
         # Create cache if enabled
         cache = None
-        if config.cache_enabled:
+        cache_enabled = config.cache_enabled and config.privacy_mode != "strict_local"
+        if cache_enabled:
             with contextlib.suppress(Exception):
                 cache = DetectorScoreCache(config.cache_dir)
 
@@ -621,7 +678,7 @@ def verify_cmd(
                 logger=logger,
                 provider=provider,
                 model="heuristic" if provider == "local" else provider,
-                cache_enabled=config.cache_enabled and cache is not None,
+                cache_enabled=cache_enabled and cache is not None,
             )
         except ProviderUnavailableError as exc:
             _report_error(
@@ -646,7 +703,7 @@ def verify_cmd(
         render_verify_result(result, json_mode=json_mode, no_color=no_color)
         completed = True
     finally:
-        if completed and counters:
+        if completed and counters and emit_metrics:
             emit_counters(counters)
 
 
@@ -676,7 +733,7 @@ def diff_facts_cmd(
     json_mode = _effective_flag(ctx, json_mode, "json_mode")
     no_color = _effective_flag(ctx, no_color, "no_color")
     counters = Counters()
-    logger = _CliLogger(counters)
+    logger, emit_metrics = _privacy_aware_logger(counters)
     completed = False
     try:
         # Read source
@@ -712,7 +769,7 @@ def diff_facts_cmd(
         render_diff_facts_result(result, json_mode=json_mode, no_color=no_color)
         completed = True
     finally:
-        if completed and counters:
+        if completed and counters and emit_metrics:
             emit_counters(counters)
 
 
@@ -748,7 +805,7 @@ def scrub_cmd(
     json_mode = _effective_flag(ctx, json_mode, "json_mode")
     no_color = _effective_flag(ctx, no_color, "no_color")
     counters = Counters()
-    logger = _CliLogger(counters)
+    logger, emit_metrics = _privacy_aware_logger(counters)
     completed = False
     try:
         # Read file
@@ -827,5 +884,5 @@ def scrub_cmd(
         render_scrub_result(result, json_mode=json_mode, no_color=no_color)
         completed = True
     finally:
-        if completed and counters:
+        if completed and counters and emit_metrics:
             emit_counters(counters)

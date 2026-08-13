@@ -1,0 +1,9 @@
+{
+  "choices": [
+    {
+      "message": {
+        "content": "{\"summary\": \"Synthetic research note: pypdf is a free and open source pure-Python PDF library maintained by the pdf community.\", \"findings\": [\"Synthetic finding: the library reads PDF files without native dependencies.\", \"Synthetic finding: its documentation is published on ReadTheDocs.\"], \"sources\": [\"https://pypdf.readthedocs.io/en/stable/\"], \"confidence\": 0.82}"
+      }
+    }
+  ]
+}

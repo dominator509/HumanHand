@@ -19,6 +19,9 @@ Use `uv` for development. End users install the built wheel with `pip`. Do not r
 | Install dependencies | `sh scripts/install.sh` | `install: ok` |
 | Lint | `sh scripts/lint.sh` | `lint: ok` |
 | Format check | `sh scripts/format-check.sh` | `format check: ok` |
+| Format selected Python files | `sh scripts/uv.sh run ruff format <paths>` | Selected files reformatted in place |
+| Fix selected lint findings | `sh scripts/uv.sh run ruff check --fix <paths>` | Safe Ruff fixes applied to selected files |
+| Targeted pytest diagnostic | `sh scripts/uv.sh run pytest <paths-or-nodeids>` | Selected tests run with normal pytest reporting |
 | Typecheck | `sh scripts/typecheck.sh` | `typecheck: ok` |
 | Unit tests | `sh scripts/test-unit.sh` | `unit tests: ok` |
 | Integration tests | `sh scripts/test-integration.sh` | `integration tests: ok` |
@@ -55,6 +58,28 @@ Use `uv` for development. End users install the built wheel with `pip`. Do not r
 | Local verify command | `sh scripts/cli.sh verify <output.txt>` | Human-likelihood result on stdout |
 | Local fact diff command | `sh scripts/cli.sh diff-facts <source.txt> <output.txt>` | Drift result on stdout |
 | Local scrub audit command | `sh scripts/cli.sh scrub --audit <file.txt>` | Metadata audit result on stdout |
+| Local import inspect command | `sh scripts/cli.sh import inspect <file.txt>` | Import inspection result on stdout |
+| Local import inspect JSON | `sh scripts/cli.sh import inspect <file.txt> --json` | Import inspection JSON on stdout |
+| Local source lane import | `sh scripts/cli.sh import source <file.txt>` | Source package result on stdout |
+| Local source lane import JSON | `sh scripts/cli.sh import source <file.txt> --json` | Source package JSON on stdout |
+| Local style lane import | `sh scripts/cli.sh import style <file.txt>` | Style sample package result on stdout |
+| Local style lane import JSON | `sh scripts/cli.sh import style <file.txt> --json` | Style sample package JSON on stdout |
+| Local style lane import with profile | `sh scripts/cli.sh import style <file.txt> --profile <label>` | Style package persisted to the Style Fidelity Vault |
+| Style review | `sh scripts/cli.sh style review <import-id>` | Review state of a stored style package |
+| Style review decision | `sh scripts/cli.sh style review <import-id> --approve <class> [--span <id>]` | Decision recorded in the append-only decision log |
+| Style profile | `sh scripts/cli.sh style profile <label>` | Deterministic style evidence profile on stdout |
+| Style coverage | `sh scripts/cli.sh style coverage <label>` | Coverage report on stdout |
+| Style invariants | `sh scripts/cli.sh style invariants <label>` | Hard invariants and soft tendencies on stdout |
+| Style comparison | `sh scripts/cli.sh style compare <label> <document>` | Comparison report on stdout (no authorship conclusion) |
+| Import pipeline tests | `sh scripts/test-importers.sh` | `importers: ok` |
+| Pre-SLM e2e workflow | `sh scripts/test-pre-slm-e2e.sh` | `pre-SLM e2e tests: ok` |
+| Local project init | `sh scripts/cli.sh project init <directory> --name <name>` | Project initialized on stdout |
+| Local project status | `sh scripts/cli.sh project status [--project <directory>]` | Layout and schema status on stdout |
+| Local project ingest | `sh scripts/cli.sh project ingest <package.json> [--project <directory>]` | Claims/entities/revision stored |
+| Local project revisions | `sh scripts/cli.sh project revisions [--project <directory>]` | Revision list on stdout |
+| Local Obsidian projection | `sh scripts/cli.sh project export-obsidian <vault> --document <package.json>` | Projected files written to the selected vault |
+| Local context preview | `sh scripts/cli.sh context preview --project <directory> --block <id> --document <package.json>` | Deterministic context capsule JSON on stdout |
+| Local context validate | `sh scripts/cli.sh context validate <capsule.json>` | Validation result on stdout |
 | Local cache setup | No standalone setup. Cache is created lazily by `humanhand verify` when enabled. | Not applicable |
 | Migrations | No migration command. Cache schema is created/updated lazily and must be backward-compatible. | Not applicable |
 
@@ -65,6 +90,10 @@ Use `uv` for development. End users install the built wheel with `pip`. Do not r
 - After EP-004, CLI command smoke tests must pass on mocked/local fallback paths.
 - After EP-007, `sh scripts/verify.sh` must pass.
 - After EP-010, `sh scripts/production-readiness-check.sh` and `sh scripts/loop.sh` must pass.
+- After EP-012, `sh scripts/cli.sh import inspect <path>` and `sh scripts/test-importers.sh` must pass.
+- After EP-013, `sh scripts/cli.sh import source <path>` and `sh scripts/cli.sh import style <path>` must pass.
+- After EP-014, `sh scripts/cli.sh style review <import-id>`, `style profile <label>`, `style coverage <label>`, `style invariants <label>`, and `style compare <label> <document>` must pass.
+- After EP-015, `sh scripts/cli.sh project init <directory> --name <name>`, `project status`, `project ingest <package.json>`, `project revisions`, `project export-obsidian <vault> --document <package.json>`, `context preview --project <directory> --block <id> --document <package.json>`, and `context validate <capsule.json>` must pass.
 
 ## Environment-Gated Commands
 
@@ -80,8 +109,10 @@ The following command families are specified but unavailable until their corresp
 ExecPlan implements and tests them. Do not invoke them early or treat this list as
 evidence that the commands already exist:
 
-- `import`, `style`, `project`, `context`, `finalize`, `export`, `audit`, `privacy`,
-  `beacon`, and `scanner`.
+- `import` (except `import inspect`, `import source`, and `import style`, which
+  EP-012/EP-013 implement), `style` (except the five EP-014 review/profile
+  commands above), `project`/`context` (except the seven EP-015 commands
+  above), `finalize`, `export`, `audit`, `privacy`, `beacon`, and `scanner`.
 - Focused validation scripts listed in the Pre-SLM blueprint are registered only when
   the implementing plan creates them.
 

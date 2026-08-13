@@ -1,0 +1,29 @@
+{
+  "schema": "lexicon",
+  "schema_version": 1,
+  "provenance": "curated-in-repo",
+  "license": "proprietary-project-internal",
+  "domain": "legal",
+  "terms": [
+    "force majeure",
+    "habeas corpus",
+    "prima facie",
+    "quantum meruit",
+    "res judicata",
+    "caveat emptor",
+    "due diligence",
+    "fiduciary duty",
+    "attorney-client privilege",
+    "statute of limitations",
+    "burden of proof",
+    "tort",
+    "plaintiff",
+    "defendant",
+    "subpoena",
+    "injunction",
+    "negligence",
+    "arbitration",
+    "jurisdiction",
+    "precedent"
+  ]
+}

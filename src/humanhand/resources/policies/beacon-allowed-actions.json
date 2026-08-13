@@ -1,0 +1,34 @@
+{
+  "schema": "beacon-allowed-actions",
+  "schema_version": 1,
+  "actions": {
+    "metadata_field_addition": {
+      "description": "Add a new metadata field to the container format after human approval.",
+      "provenance": "curated-in-repo"
+    },
+    "container_mechanism_research": {
+      "description": "Research a new container mechanism for provenance metadata.",
+      "provenance": "curated-in-repo"
+    },
+    "provenance_standard_research": {
+      "description": "Research an external provenance standard for adoption.",
+      "provenance": "curated-in-repo"
+    },
+    "telemetry_documentation": {
+      "description": "Document telemetry changes without enabling new data collection.",
+      "provenance": "curated-in-repo"
+    },
+    "privacy_technique_research": {
+      "description": "Research a privacy technique applied strictly locally.",
+      "provenance": "curated-in-repo"
+    },
+    "scanner_benchmark": {
+      "description": "Maintain scanner benchmark fixtures and advisory reporting.",
+      "provenance": "curated-in-repo"
+    },
+    "dependency_update_proposal": {
+      "description": "Propose a parser or exporter dependency update for review.",
+      "provenance": "curated-in-repo"
+    }
+  }
+}

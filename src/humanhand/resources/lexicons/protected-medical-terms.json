@@ -1,0 +1,27 @@
+{
+  "schema": "lexicon",
+  "schema_version": 1,
+  "provenance": "curated-in-repo",
+  "license": "proprietary-project-internal",
+  "domain": "medical",
+  "terms": [
+    "tachycardia",
+    "arrhythmia",
+    "hypertension",
+    "hypotension",
+    "anemia",
+    "diabetes",
+    "epilepsy",
+    "melanoma",
+    "thrombosis",
+    "ischemia",
+    "edema",
+    "sepsis",
+    "aneurysm",
+    "embolism",
+    "osteoporosis",
+    "arthritis",
+    "asthma",
+    "bronchitis"
+  ]
+}

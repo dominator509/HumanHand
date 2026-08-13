@@ -143,3 +143,36 @@ def read_bytes(path: str | Path) -> bytes:
         return p.read_bytes()
     except OSError as exc:
         raise FileIOError(f"Cannot read file: {p}") from exc
+
+
+def file_size(path: str | Path) -> int:
+    """Return a regular file's size in bytes without reading it.
+
+    Raises:
+        FileIOError: If the path is missing, not a regular file, or unstatable.
+    """
+    p = Path(path)
+    if not p.exists():
+        raise FileIOError(f"File not found: {p}")
+    if not p.is_file():
+        raise FileIOError(f"Not a regular file: {p}")
+    try:
+        return p.stat().st_size
+    except OSError as exc:
+        raise FileIOError(f"Cannot read file: {p}") from exc
+
+
+def read_head_bytes(path: str | Path, max_bytes: int) -> bytes:
+    """Read at most ``max_bytes`` bytes from the start of a file.
+
+    Used for magic-byte identity checks on files that are too large to read
+    fully. Raises FileIOError like :func:`read_bytes`.
+    """
+    p = Path(path)
+    if not p.exists():
+        raise FileIOError(f"File not found: {p}")
+    try:
+        with p.open("rb") as handle:
+            return handle.read(max_bytes)
+    except OSError as exc:
+        raise FileIOError(f"Cannot read file: {p}") from exc

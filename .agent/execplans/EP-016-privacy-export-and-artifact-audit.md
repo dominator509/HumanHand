@@ -1,10 +1,10 @@
 ---
 id: EP-016
 title: Privacy Modes, Public Artifacts, Export, and Audit
-status: planned
+status: complete
 owner: claude
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-08-13
 ---
 
 # EP-016: Privacy, Export, and Artifact Audit
@@ -85,19 +85,34 @@ separately from public artifacts.
 
 ## Progress
 
-- [ ] M1
-- [ ] M2
-- [ ] M3
-- [ ] M4
+- [x] M1
+- [x] M2
+- [x] M3
+- [x] M4
 
 ## Surprises & Discoveries
 
-Record format-library and privacy-mode findings.
+- The initial merge loaded bundled privacy JSON from the domain layer and did
+  not enforce strict-local behavior in the root rewrite/verify/health paths.
+- Export could fall back to derived claims without an accepted ingested
+  revision and private-output detection was case-sensitive.
+- Artifact auditors did not consistently reject external relationships,
+  hidden DOCX text, recursive PDF active content, or remote Markdown content.
 
 ## Decision Log
 
-Record retention, encryption, exporter, and dependency decisions.
+- Keep resource I/O in infra loaders and keep domain policy parsing pure.
+- In strict-local mode, reject network-backed work before reading user text,
+  disable detector cache use, and suppress logs/counters through NullLogger.
+- Require an accepted ingested revision for export and reject every nested or
+  case-variant `.humanhand`/cache output path.
+- Make DOCX, PDF, and Markdown audits fail closed on hidden, active, external,
+  prohibited-metadata, missing-title, and missing-claim findings.
 
 ## Outcomes & Retrospective
 
-Complete at the boundary with format coverage and privacy evidence.
+Complete. Privacy enforcement is wired into real CLI commands; export is
+revision-backed and non-overwriting; artifact audits cover the documented
+active/hidden/external surfaces. Unit, integration, E2E, importer-focused, and
+full verification suites pass; `verify.sh` reports 1948 passed, 15 skipped,
+86.35% coverage, and `verify: ok`.

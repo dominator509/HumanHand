@@ -162,6 +162,60 @@ class TestVerifyCommand:
         assert result.exit_code != 0
 
 
+class TestStrictLocalPrivacyMode:
+    def test_health_emits_no_logs_or_counters(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HUMANHAND_PRIVACY_MODE", "strict_local")
+        result = runner.invoke(app, ["health", "--json"])
+        assert result.exit_code == 0
+        assert result.stderr == ""
+
+    def test_rewrite_is_denied_before_input_read(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HUMANHAND_PRIVACY_MODE", "strict_local")
+        result = runner.invoke(
+            app,
+            [
+                "rewrite",
+                "--source",
+                "missing-source.txt",
+                "--style",
+                "missing-style.txt",
+                "--out",
+                "out.txt",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 2
+        assert "forbids network-backed rewrite" in result.stdout
+        assert result.stderr == ""
+
+    def test_remote_verify_is_denied_before_input_read(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("HUMANHAND_PRIVACY_MODE", "strict_local")
+        result = runner.invoke(
+            app,
+            ["verify", "missing-output.txt", "--provider", "gptzero", "--json"],
+        )
+        assert result.exit_code == 2
+        assert "permits only the local detector" in result.stdout
+        assert result.stderr == ""
+
+    def test_local_verify_emits_no_logs_and_creates_no_cache(
+        self,
+        output_file: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        cache_dir = tmp_path / "cache"
+        monkeypatch.setenv("HUMANHAND_PRIVACY_MODE", "strict_local")
+        monkeypatch.setenv("HUMANHAND_CACHE_ENABLED", "1")
+        monkeypatch.setenv("HUMANHAND_CACHE_DIR", str(cache_dir))
+        result = runner.invoke(app, ["verify", output_file, "--provider", "local", "--json"])
+        assert result.exit_code == 0
+        assert result.stderr == ""
+        assert not cache_dir.exists()
+
+
 # ── Diff-facts command ──────────────────────────────────────────
 
 

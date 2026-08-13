@@ -9,14 +9,18 @@ from __future__ import annotations
 import json
 import os
 import sys
+from typing import Any
 
 from humanhand import __version__
+from humanhand.application.import_services import SourceImportResult, StyleImportResult
 from humanhand.application.services import (
     DiffFactsResult,
     RewriteResult,
     ScrubResult,
     VerifyResult,
 )
+from humanhand.domain.canonical_document import ImportInspection
+from humanhand.domain.document_serialization import inspection_to_json
 from humanhand.infra.config import Config
 
 # ── Color helpers ────────────────────────────────────────────────
@@ -275,3 +279,231 @@ def render_scrub_result(
             print(f"  {cat} {f.location}: {f.description}{removed_str}")
         if not result.audit_only and result.output_path:
             print(f"  Output: {result.output_path}")
+
+
+# ── Style Fidelity Vault renderers (EP-014) ────────────────────────
+
+
+def _asdict_payload(value: Any) -> dict[str, object]:
+    import dataclasses
+
+    payload = dataclasses.asdict(value)
+    return payload
+
+
+def render_style_review(
+    package: object,
+    json_mode: bool = False,
+    *,
+    no_color: bool = False,
+) -> None:
+    """Render a style package review state."""
+    if json_mode:
+        from humanhand.domain.style_serialization import package_to_payload
+
+        print(
+            json.dumps(package_to_payload(package), sort_keys=True, ensure_ascii=False)  # type: ignore[arg-type]
+        )
+        return
+    authorship = package.authorship  # type: ignore[attr-defined]
+    print(f"Style package: {package.package_id}")  # type: ignore[attr-defined]
+    print(f"  Profile label: {package.profile_label}")  # type: ignore[attr-defined]
+    print(f"  Spans: {len(authorship.spans)}")
+    print(f"  Unresolved: {len(authorship.unresolved_spans)}")
+    for span in authorship.spans:
+        marker = " " if span.is_resolved else "*"
+        print(
+            f"  {marker} {span.span_id} [{span.authorship_class.value}] "
+            f"({span.source_location.start_offset}..{span.source_location.end_offset})"
+        )
+    for excluded in authorship.excluded:
+        print(f"  x {excluded.span_id} [excluded] {excluded.reason}")
+
+
+def render_style_profile(
+    profile: object,
+    json_mode: bool = False,
+    *,
+    no_color: bool = False,
+) -> None:
+    """Render a style evidence profile."""
+    if json_mode:
+        from humanhand.domain.style_profiles import profile_to_json
+
+        print(profile_to_json(profile), end="")  # type: ignore[arg-type]
+        return
+    print(f"Style profile: {profile.profile_id}")  # type: ignore[attr-defined]
+    print(f"  Status: {profile.status}")  # type: ignore[attr-defined]
+    print(f"  Sample words: {profile.sample_word_count}")  # type: ignore[attr-defined]
+    print(f"  Packages: {len(profile.package_ids)}")  # type: ignore[attr-defined]
+    print(f"  Hard invariants: {len(profile.hard_invariants)}")  # type: ignore[attr-defined]
+    print(f"  Soft tendencies: {len(profile.soft_tendencies)}")  # type: ignore[attr-defined]
+
+
+def render_style_coverage(
+    report: object,
+    json_mode: bool = False,
+    *,
+    no_color: bool = False,
+) -> None:
+    """Render a style coverage report."""
+    if json_mode:
+        print(json.dumps(_asdict_payload(report), sort_keys=True, ensure_ascii=False))
+        return
+    print(f"Coverage: {report.status}")  # type: ignore[attr-defined]
+    print(f"  Visible text: {report.visible_text_coverage:.0%}")  # type: ignore[attr-defined]
+    print(f"  Sample sufficiency: {report.sample_sufficiency}")  # type: ignore[attr-defined]
+    print(f"  Unresolved spans: {report.unresolved_span_count}")  # type: ignore[attr-defined]
+
+
+def render_style_invariants(
+    profile: object,
+    json_mode: bool = False,
+    *,
+    no_color: bool = False,
+) -> None:
+    """Render hard invariants and soft tendencies."""
+    invariants = profile.hard_invariants  # type: ignore[attr-defined]
+    tendencies = profile.soft_tendencies  # type: ignore[attr-defined]
+    if json_mode:
+        payload = {
+            "hard_invariants": [_asdict_payload(item) for item in invariants],
+            "soft_tendencies": [_asdict_payload(item) for item in tendencies],
+        }
+        print(json.dumps(payload, sort_keys=True, ensure_ascii=False))
+        return
+    for invariant in invariants:
+        print(f"  [{invariant.status.value}] {invariant.kind.value}: {invariant.value}")
+    for tendency in tendencies:
+        print(f"  ~ {tendency.name} ({tendency.strength}): {tendency.value}")
+
+
+def render_style_comparison(
+    report: object,
+    json_mode: bool = False,
+    *,
+    no_color: bool = False,
+) -> None:
+    """Render a style comparison report (no authorship conclusion)."""
+    if json_mode:
+        print(json.dumps(_asdict_payload(report), sort_keys=True, ensure_ascii=False))
+        return
+    print(f"Comparison: {report.profile_id}")  # type: ignore[attr-defined]
+    print(f"  Confidence: {report.confidence:.2%}")  # type: ignore[attr-defined]
+    print(f"  Evidence coverage: {report.evidence_coverage:.0%}")  # type: ignore[attr-defined]
+    print(f"  Invariant violations: {len(report.hard_invariant_violations)}")  # type: ignore[attr-defined]
+    for violation in report.hard_invariant_violations:  # type: ignore[attr-defined]
+        print(f"  ! {violation.kind.value}: {violation.evidence}")
+    print("  No authorship conclusion is drawn.")
+
+
+def render_import_inspection(
+    inspection: ImportInspection,
+    json_mode: bool = False,
+    *,
+    no_color: bool = False,
+    include_content: bool = False,
+) -> None:
+    """Render an import inspection result to stdout.
+
+    Findings never contain user text; canonical content is opt-in via
+    ``include_content`` and JSON-only.
+    """
+    if json_mode:
+        payload = inspection.to_payload(include_content=include_content)
+        print(json.dumps(payload, sort_keys=True, ensure_ascii=False))
+        return
+
+    identity = inspection.file_identity
+    print(
+        f"Import: {inspection.status.value} ({identity.given_path})"
+        f" [{identity.declared_kind.value}, {identity.size_bytes} bytes, "
+        f"{identity.magic.description}]"
+    )
+    print(f"  Findings: {len(inspection.findings)}")
+    for finding in inspection.findings:
+        location = ""
+        if finding.location is not None:
+            location = f" @line {finding.location.line_start}"
+        print(
+            f"  - {bold(f'[{finding.category.value}]', no_color)} "
+            f"{finding.code}: {finding.description}{location}"
+        )
+    if inspection.measurements is not None:
+        measurements = inspection.measurements
+        print(
+            f"  Nodes: {measurements.node_count}, depth {measurements.tree_depth}, "
+            f"expanded {measurements.expanded_bytes} bytes"
+        )
+
+
+def render_source_import_result(
+    result: SourceImportResult,
+    json_mode: bool = False,
+    *,
+    no_color: bool = False,
+) -> None:
+    """Render a source-lane import result to stdout.
+
+    JSON mode emits the full source package (document + evidence). When the
+    import failed closed, JSON mode emits the inspection instead so the
+    reason is always visible.
+    """
+    if result.package is not None:
+        if json_mode:
+            print(result.package.to_json(), end="")
+        else:
+            package = result.package
+            print(f"Source package: {package.package_id}")
+            print(f"  Status: {package.status.value}")
+            print(f"  Nodes: {len(package.document.nodes)}")
+            print(f"  Protected spans: {len(package.evidence.protected_spans.spans)}")
+            print(f"  Quotations: {len(package.evidence.quotations)}")
+            print(f"  Citations: {len(package.evidence.citations)}")
+            print(f"  Findings: {len(package.findings)}")
+        return
+
+    # Fail-closed: no package; explain via the inspection.
+    if json_mode:
+        print(inspection_to_json(result.inspection), end="")
+    else:
+        render_import_inspection(result.inspection, json_mode=False, no_color=no_color)
+
+
+def render_style_import_result(
+    result: StyleImportResult,
+    json_mode: bool = False,
+    *,
+    no_color: bool = False,
+    vault_package_id: str | None = None,
+) -> None:
+    """Render a style-lane import result to stdout.
+
+    JSON mode emits the full style sample package (document + metadata,
+    never fact evidence) plus the vault review handle when persisted.
+    Fail-closed imports emit the inspection instead.
+    """
+    if result.package is not None:
+        if json_mode:
+            if vault_package_id is not None:
+                import json as _json
+
+                payload = json.loads(result.package.to_json())
+                payload["vault_package_id"] = vault_package_id
+                print(_json.dumps(payload, sort_keys=True, ensure_ascii=False), end="")
+                return
+            print(result.package.to_json(), end="")
+        else:
+            package = result.package
+            print(f"Style package: {package.package_id}")
+            print(f"  Status: {package.status.value}")
+            print(f"  Authorship status: {package.authorship_status}")
+            print(f"  Nodes: {len(package.document.nodes)}")
+            print(f"  Metadata items: {len(package.metadata.items)}")
+            print(f"  Findings: {len(package.findings)}")
+        return
+
+    if json_mode:
+        print(inspection_to_json(result.inspection), end="")
+    else:
+        render_import_inspection(result.inspection, json_mode=False, no_color=no_color)

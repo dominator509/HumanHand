@@ -31,6 +31,44 @@ store are allowed by the Pre-SLM ADRs; there is still no daemon or hidden global
 | `src/humanhand/infra/detectors/` | Detector provider adapters and local heuristic fallback. |
 | `src/humanhand/infra/cache.py` | Optional SQLite detector-score cache; stores no text. |
 | `src/humanhand/infra/logging.py` | Structured JSONL logs to stderr, redaction, counters. |
+| `src/humanhand/domain/canonical_document.py` | Deterministic canonical document, import inspection, and builders. |
+| `src/humanhand/domain/document_nodes.py` | Typed canonical node model with exact source spans. |
+| `src/humanhand/domain/document_serialization.py` | Byte-deterministic canonical/inspection JSON with validation. |
+| `src/humanhand/domain/file_identity.py` | Extension/magic detection and identity findings. |
+| `src/humanhand/domain/import_policy.py` | Versioned import policy and deterministic limit checks. |
+| `src/humanhand/domain/unicode_policy.py` | BOM detection, Unicode inventory, and canonical NFC views. |
+| `src/humanhand/domain/active_content.py` | Deterministic active-content and remote-resource scanning. |
+| `src/humanhand/domain/metadata_inventory.py` | Document-embedded metadata inventory (separate channel). |
+| `src/humanhand/domain/protected_spans.py` | Deterministic protected-span extraction (source lane only). |
+| `src/humanhand/domain/quotations.py` / `citations.py` | Quotation and citation extraction (source lane only). |
+| `src/humanhand/domain/source_evidence.py` | Source evidence: spans, quotations, citations (never style lane). |
+| `src/humanhand/domain/source_package.py` | Lane-separated SourcePackage / StyleSamplePackage (ADR-002). |
+| `src/humanhand/domain/style_authorship.py` | Authorship review model (no auto-inference; structural QUOTATION only). |
+| `src/humanhand/domain/style_surface.py` / `style_artifacts.py` | Exact surface and StyleEvidencePackage artifacts (ADR-003). |
+| `src/humanhand/domain/style_serialization.py` | Deterministic style package JSON with validation. |
+| `src/humanhand/domain/style_metrics.py` | Advanced deterministic style metrics (blueprint 8.4). |
+| `src/humanhand/domain/style_invariants.py` / `style_coverage.py` | Hard invariants, soft tendencies, and coverage enforcement (blueprint 8.2/8.5). |
+| `src/humanhand/domain/style_profiles.py` / `style_compare.py` | Profile aggregation and comparison (no authorship conclusions). |
+| `src/humanhand/infra/stores/style_vault.py` | File-backed write-once vault: originals, packages, decision log. |
+| `src/humanhand/application/style_ports.py` / `style_services.py` | Vault use cases: package build, decision replay, review. |
+| `src/humanhand/cli/style_commands.py` | `humanhand style review|profile|coverage|invariants|compare`. |
+| `src/humanhand/domain/claims_v2.py` / `claim_diff.py` | ClaimV2 contracts with modality/negation/coverage + deterministic diff. |
+| `src/humanhand/domain/entities.py` / `relationships.py` | Deterministic entity/relationship extraction (never invented). |
+| `src/humanhand/domain/revisions.py` | Optimistic revision tokens; stale writes fail closed. |
+| `src/humanhand/domain/project.py` / `structure_signature.py` | Project state and deterministic structural digests. |
+| `src/humanhand/domain/context_capsule.py` / `context_policy.py` | Deterministic inspectable capsules (no model client). |
+| `src/humanhand/infra/stores/project_layout.py` | `.humanhand/` layout (ADR-001), idempotent init. |
+| `src/humanhand/infra/stores/project_schema.py` / `migration_runner.py` | Versioned schema v1 + transactional migrations with backup/rollback. |
+| `src/humanhand/infra/stores/project_store.py` | SQLite project store; optimistic revisions; encrypted fields when enabled. |
+| `src/humanhand/infra/stores/key_provider.py` + DPAPI/test providers | Application-layer encryption boundary (ADR-005). |
+| `src/humanhand/infra/stores/encrypted_fields.py` / `encrypted_blob_store.py` | Field codec and encrypted blob files. |
+| `src/humanhand/infra/project/` | Optional non-authoritative Obsidian projection + public canonical JSON. |
+| `src/humanhand/cli/project_commands.py` / `context_commands.py` | `humanhand project|context` sub-apps (EP-015). |
+| `src/humanhand/infra/importers/` | Clean-room TXT/Markdown + DOCX/PDF/HTML/RTF/ODT adapters; legacy DOC converter port. |
+| `src/humanhand/infra/sandbox/` | Bounded parser worker protocol, worker, and supervisor (ADR-004). |
+| `src/humanhand/application/import_ports.py` | Ports for import file reading and worker supervision. |
+| `src/humanhand/application/import_services.py` | Import inspection + source/style lane use cases; parsing via the worker. |
+| `src/humanhand/cli/import_commands.py` | `humanhand import inspect|source|style` sub-app registration. |
 | `tests/unit/` | Pure and fast unit tests, no network. |
 | `tests/integration/` | Integration tests with mocked HTTP and temporary filesystem. |
 | `tests/e2e/` | CLI acceptance tests; live tests gated. |

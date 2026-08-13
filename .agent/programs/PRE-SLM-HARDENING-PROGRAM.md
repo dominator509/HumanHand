@@ -2,8 +2,8 @@
 id: PRE-SLM-HARDENING-PROGRAM
 title: HumanHand Pre-SLM Hardening Program
 status: active
-current_execplan: EP-011
-last_completed_execplan: EP-010
+current_execplan: EP-019
+last_completed_execplan: EP-018
 ---
 
 # HumanHand Pre-SLM Hardening Program
@@ -24,20 +24,21 @@ it preserves available evidence and reports unsupported or unresolved cases hone
 - `CODEX_BOOTSTRAP_PROMPT_HUMANHAND_PRE_SLM.md` defines the resumable execution sequence.
 - Repository rules and the active ExecPlan remain authoritative when details conflict.
 - Claude Code is the bulk implementer for one plan; Codex audits and fixes at each boundary.
-- EP-011 is the active bootstrap plan. No later plan may begin in this session.
+- EP-011 through EP-018 are complete and audited. EP-019 is the next
+  implementation seam; this status update does not start EP-019.
 
 ## Sequence
 
 | Plan | Result | Status |
 |---|---|---|
-| EP-011 | Program contract, ADRs, specs, and architecture migration | active |
-| EP-012 | Canonical document model and parser sandbox | planned |
-| EP-013 | Dual clean-room source/style ingress | planned |
-| EP-014 | Style Fidelity Vault | planned |
-| EP-015 | Fact Integrity V2, Project Brain, and Context Broker | planned |
-| EP-016 | Privacy modes, public artifacts, exporters, and auditors | planned |
-| EP-017 | Deterministic lexical finalization and human review | planned |
-| EP-018 | Research Beacon and scanner observatory | planned |
+| EP-011 | Program contract, ADRs, specs, and architecture migration | complete |
+| EP-012 | Canonical document model and parser sandbox | complete |
+| EP-013 | Dual clean-room source/style ingress | complete |
+| EP-014 | Style Fidelity Vault | complete |
+| EP-015 | Fact Integrity V2, Project Brain, and Context Broker | complete |
+| EP-016 | Privacy modes, public artifacts, exporters, and auditors | complete |
+| EP-017 | Deterministic lexical finalization and human review | complete |
+| EP-018 | Research Beacon and scanner observatory | complete |
 | EP-019 | Pre-SLM integration, migration, and readiness | planned |
 
 ## Non-goals

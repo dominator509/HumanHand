@@ -6,8 +6,12 @@ import math
 import re
 from collections import Counter
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from humanhand.domain.types import DomainError, StyleFingerprint
+
+if TYPE_CHECKING:
+    from humanhand.domain.style_profiles import StyleEvidenceProfile
 
 
 def extract_style_fingerprint(text: str) -> StyleFingerprint:
@@ -192,3 +196,60 @@ def _compute_formality(words: list[str]) -> float:
     # Normalize to [0, 1] using sigmoid
     formality = 1.0 / (1.0 + math.exp(-5 * raw))
     return formality
+
+
+def project_style_fingerprint(profile: StyleEvidenceProfile) -> StyleFingerprint:
+    """Project a StyleEvidenceProfile onto the legacy StyleFingerprint.
+
+    SPEC-011 compatibility facade: the old fingerprint remains available
+    for legacy rewrite input without mutating the vault. The projection is
+    deterministic and documented per field below.
+    """
+    from humanhand.domain.style_invariants import InvariantKind
+
+    metrics = profile.metrics
+    sentence_dist = metrics.syntax.sentence_length_distribution
+    paragraph_dist = metrics.rhythm.paragraph_length_distribution
+    punctuation = metrics.punctuation
+
+    # Legacy punctuation ratios are per-character counts over the profile's
+    # voice text; the denominator is the true voice-text length so the
+    # projection mirrors the legacy fingerprint's ratio scale.
+    total_chars = max(len(profile.voice_text), 1)
+    ratios: dict[str, float] = {
+        "comma": round(punctuation.counts.get(",", 0) / total_chars, 6),
+        "period": round(punctuation.counts.get(".", 0) / total_chars, 6),
+        "question": round(punctuation.counts.get("?", 0) / total_chars, 6),
+        "exclamation": round(punctuation.counts.get("!", 0) / total_chars, 6),
+        "semicolon": round(punctuation.counts.get(";", 0) / total_chars, 6),
+        "colon": round(punctuation.counts.get(":", 0) / total_chars, 6),
+        "dash": round(punctuation.counts.get("—", 0) / total_chars, 6),
+        "quote": round(punctuation.counts.get('"', 0) / total_chars, 6),
+        "apostrophe": round(punctuation.counts.get("'", 0) / total_chars, 6),
+        "parenthesis": round(
+            (punctuation.counts.get("(", 0) + punctuation.counts.get(")", 0)) / total_chars,
+            6,
+        ),
+    }
+
+    # Common phrases: the profile keeps preferred-terminology bigrams
+    # (documented difference from the legacy top-10 extraction).
+    common_phrases: tuple[str, ...] = ()
+    for invariant in profile.hard_invariants:
+        if invariant.kind is InvariantKind.PREFERRED_TERMINOLOGY and invariant.value:
+            common_phrases = tuple(term for term in invariant.value.split("|") if term)
+            break
+
+    return StyleFingerprint(
+        avg_sentence_length=round(sentence_dist.mean, 2),
+        sentence_length_variance=round(sentence_dist.stdev**2, 2),
+        avg_paragraph_length=round(paragraph_dist.mean, 2),
+        punctuation_ratios=ratios,
+        vocabulary_richness=round(metrics.lexical.type_token_ratio, 4),
+        common_phrases=common_phrases,
+        formality_score=round(metrics.register.formality_score, 4),
+        avg_word_length=round(metrics.lexical.avg_word_length, 2),
+        total_sentences=sentence_dist.count,
+        total_paragraphs=paragraph_dist.count,
+        total_words=profile.sample_word_count,
+    )

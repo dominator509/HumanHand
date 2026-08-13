@@ -81,7 +81,9 @@ class TestDomainImportBoundaries:
         for py_file in package_dir.rglob("*.py"):
             if py_file.name == "__init__.py" and py_file.parent == package_dir:
                 continue  # Allow __init__.py re-exports
-            content = py_file.read_text()
+            # Repo files are UTF-8 by rule; the locale default would break
+            # on any domain source containing non-cp1252 characters.
+            content = py_file.read_text(encoding="utf-8")
             for line in content.splitlines():
                 stripped = line.strip()
                 if stripped.startswith("import ") or stripped.startswith("from "):

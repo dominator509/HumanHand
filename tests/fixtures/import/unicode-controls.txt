@@ -1,0 +1,2 @@
+Line with bell character.
+Plain second line.

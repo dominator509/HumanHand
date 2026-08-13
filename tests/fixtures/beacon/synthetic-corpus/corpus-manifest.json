@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "samples": [
+    {
+      "sample_id": "authentic-letter-001",
+      "group": "authentic_human",
+      "file": "sample-authentic-letter.txt"
+    },
+    {
+      "sample_id": "public-domain-essay-001",
+      "group": "public_domain_style",
+      "file": "sample-public-domain-essay.txt"
+    },
+    {
+      "sample_id": "base-model-notes-001",
+      "group": "base_model_synthetic",
+      "file": "sample-base-model-notes.txt"
+    },
+    {
+      "sample_id": "humanhand-output-001",
+      "group": "humanhand_output",
+      "file": "sample-humanhand-output.txt"
+    },
+    {
+      "sample_id": "coauthored-brief-001",
+      "group": "coauthored",
+      "file": "sample-coauthored-brief.txt"
+    }
+  ]
+}

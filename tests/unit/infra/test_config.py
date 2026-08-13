@@ -109,3 +109,51 @@ class TestLoadConfigOptionalStrings:
         assert config.llm_base_url is None
         assert config.llm_api_key is None
         assert config.llm_model is None
+
+
+class TestLoadConfigImportLimits:
+    def test_import_defaults(self) -> None:
+        config = Config()
+        assert config.import_max_bytes == 4_000_000
+        assert config.import_max_expanded_bytes == 16_000_000
+        assert config.import_max_nodes == 50_000
+        assert config.import_timeout_seconds == 30.0
+
+    def test_import_env_overrides(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HUMANHAND_IMPORT_MAX_BYTES", "1000")
+        monkeypatch.setenv("HUMANHAND_IMPORT_MAX_EXPANDED_BYTES", "4000")
+        monkeypatch.setenv("HUMANHAND_IMPORT_MAX_NODES", "500")
+        monkeypatch.setenv("HUMANHAND_IMPORT_TIMEOUT_SECONDS", "5")
+        config = load_config()
+        assert config.import_max_bytes == 1000
+        assert config.import_max_expanded_bytes == 4000
+        assert config.import_max_nodes == 500
+        assert config.import_timeout_seconds == 5.0
+
+    def test_import_max_bytes_must_be_positive(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HUMANHAND_IMPORT_MAX_BYTES", "0")
+        with pytest.raises(ValueError, match="HUMANHAND_IMPORT_MAX_BYTES"):
+            load_config()
+
+    def test_import_expanded_must_cover_max_bytes(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HUMANHAND_IMPORT_MAX_BYTES", "10000")
+        monkeypatch.setenv("HUMANHAND_IMPORT_MAX_EXPANDED_BYTES", "9999")
+        with pytest.raises(ValueError, match="EXPANDED"):
+            load_config()
+
+    def test_import_nodes_must_be_positive(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HUMANHAND_IMPORT_MAX_NODES", "-3")
+        with pytest.raises(ValueError, match="HUMANHAND_IMPORT_MAX_NODES"):
+            load_config()
+
+    def test_import_timeout_must_be_positive(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HUMANHAND_IMPORT_TIMEOUT_SECONDS", "0")
+        with pytest.raises(ValueError, match="HUMANHAND_IMPORT_TIMEOUT_SECONDS"):
+            load_config()
+
+    def test_project_dir_default_and_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        assert Config().project_dir is None
+        monkeypatch.setenv("HUMANHAND_PROJECT_DIR", "C:/work/my-project")
+        assert load_config().project_dir == "C:/work/my-project"
+        monkeypatch.setenv("HUMANHAND_PROJECT_DIR", "  ")
+        assert load_config().project_dir is None

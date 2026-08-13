@@ -1,0 +1,21 @@
+{
+  "schema": "lexicon",
+  "schema_version": 1,
+  "provenance": "curated-in-repo",
+  "license": "proprietary-project-internal",
+  "domain": "general",
+  "terms": [
+    "GDPR",
+    "ISO",
+    "URL",
+    "API",
+    "ASCII",
+    "UTF-8",
+    "Unicode",
+    "PDF",
+    "DOCX",
+    "Markdown",
+    "Obsidian",
+    "GitHub"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "schema": "beacon-blocked-actions",
+  "schema_version": 1,
+  "actions": {
+    "upload_private_document": {
+      "description": "Upload a private document to any external service.",
+      "provenance": "curated-in-repo"
+    },
+    "detector_optimization": {
+      "description": "Optimize detector scores on real or private outputs.",
+      "provenance": "curated-in-repo"
+    },
+    "provenance_destruction": {
+      "description": "Destroy, strip, or falsify provenance metadata.",
+      "provenance": "curated-in-repo"
+    },
+    "auto_merge": {
+      "description": "Merge changes without human approval.",
+      "provenance": "curated-in-repo"
+    },
+    "auto_publish": {
+      "description": "Publish artifacts without human release approval.",
+      "provenance": "curated-in-repo"
+    },
+    "auto_deploy": {
+      "description": "Deploy code or services without human release approval.",
+      "provenance": "curated-in-repo"
+    },
+    "watermark_key_recovery": {
+      "description": "Attempt watermark or key recovery.",
+      "provenance": "curated-in-repo"
+    },
+    "code_change_without_review": {
+      "description": "Change code without an audited review pass.",
+      "provenance": "curated-in-repo"
+    }
+  }
+}

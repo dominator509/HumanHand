@@ -1,0 +1,30 @@
+{
+  "schema": "privacy-modes",
+  "schema_version": 1,
+  "modes": {
+    "strict_local": {
+      "network_allowed": false,
+      "raw_text_logging": false,
+      "detector_cache_enabled": false,
+      "obsidian_projection_auto": false,
+      "retention_enforced": true,
+      "encrypt_sensitive_fields": true
+    },
+    "private_audited": {
+      "network_allowed": true,
+      "raw_text_logging": false,
+      "detector_cache_enabled": true,
+      "obsidian_projection_auto": false,
+      "retention_enforced": false,
+      "encrypt_sensitive_fields": false
+    },
+    "regulated": {
+      "network_allowed": true,
+      "raw_text_logging": false,
+      "detector_cache_enabled": false,
+      "obsidian_projection_auto": false,
+      "retention_enforced": true,
+      "encrypt_sensitive_fields": true
+    }
+  }
+}

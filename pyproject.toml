@@ -22,6 +22,10 @@ dependencies = [
     "httpx>=0.27,<1",
     "openai>=1.30,<2",
     "pydantic>=2,<3",
+    "pypdf>=5,<7",
+    "defusedxml>=0.7,<1",
+    "cryptography>=50,<53",
+    "reportlab>=4,<5",
 ]
 
 [project.optional-dependencies]
@@ -77,6 +81,7 @@ markers = [
     "live: tests that require live network (deselect by default)",
     "live_e2e: end-to-end tests that require live services (deselect by default)",
     "slow: tests that are slow (deselect by default)",
+    "importers: focused clean-room import pipeline tests (EP-012)",
 ]
 addopts = "-v --strict-markers --tb=short"
 

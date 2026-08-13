@@ -36,6 +36,12 @@ Use uv for development. Do not use Poetry, pipenv, npm, pnpm, conda, or ad-hoc v
 | `WINSTON_API_KEY` | Optional | live detector | `env-provided-secret` | Yes | Winston AI API key. | Required only when provider is `winston`; redacted. |
 | `TURNITIN_API_KEY` | Optional | live detector | `env-provided-secret` | Yes | Turnitin AI API credential if a supported account/API exists. | Required only when provider is `turnitin`; adapter must not invent endpoints. |
 | `HUMANHAND_RUN_LIVE_E2E` | Optional | test | `1` | No | Enables live E2E tests. | Default false. Live tests skip unless true. |
+| `HUMANHAND_IMPORT_MAX_BYTES` | Optional | all | `4000000` | No | Import input size cap. | Positive integer; default 4000000. Files over the cap fail closed without being read. |
+| `HUMANHAND_IMPORT_MAX_EXPANDED_BYTES` | Optional | all | `16000000` | No | Import expanded-size cap. | Positive integer; must be >= `HUMANHAND_IMPORT_MAX_BYTES`; default 16000000. |
+| `HUMANHAND_IMPORT_MAX_NODES` | Optional | all | `50000` | No | Import canonical node count cap. | Positive integer; default 50000. |
+| `HUMANHAND_IMPORT_TIMEOUT_SECONDS` | Optional | all | `30` | No | Parser worker time budget. | Positive number; default 30. The bounded worker is killed when exceeded. |
+| `HUMANHAND_STYLE_VAULT_DIR` | Optional | all | `.humanhand/style-vault` | No | Local Style Fidelity Vault directory (write-once originals/packages + decision log). | Writable local directory; default `.humanhand/style-vault`. Never contains network artifacts. |
+| `HUMANHAND_PROJECT_DIR` | Optional | all | unset | No | User-selected project directory for `project`/`context` commands (ADR-001). | Must point at an initialized project layout when used; nothing is written outside `.humanhand/`. |
 | `NO_COLOR` | Optional | all | `1` | No | Standard no-color signal. | Any non-empty value disables color. |
 
 ## Secrets
@@ -91,10 +97,11 @@ Config loading must validate env vars at command startup and fail before reading
 ## Pre-SLM Environment Boundary
 
 Pre-SLM project policy belongs in a user-selected `.humanhand/project.toml`; secrets
-remain environment variables or ignored local files. Proposed Pre-SLM variables are
-not active until their implementing specification and tests define them. Research and
-scanner network calls remain disabled unless an explicit plan, provider contract, and
-live-test gate enable them.
+remain environment variables or ignored local files. As of EP-012 the four
+`HUMANHAND_IMPORT_*` variables above are active and covered by config tests; other
+proposed Pre-SLM variables remain inactive until their implementing specification and
+tests define them. Research and scanner network calls remain disabled unless an
+explicit plan, provider contract, and live-test gate enable them.
 
 On Windows Git Bash, canonical scripts use `sh scripts/uv.sh` so an installed `uv.cmd`
 shim is resolved without changing the documented command surface.

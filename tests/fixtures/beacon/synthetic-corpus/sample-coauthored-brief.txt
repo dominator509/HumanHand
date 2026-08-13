@@ -1,0 +1,3 @@
+Draft by A. Reyes, edited with AI assistance:
+
+The survey ran for three weeks and collected 412 responses. The results show that most users want a simpler settings screen. [AI suggestion: group the options into three categories and put the advanced ones behind a second link.] We agree with that change, though we would keep the export button where it is, since power users look for it in the same spot every time. Next step: prepare the mockup before the Friday review.

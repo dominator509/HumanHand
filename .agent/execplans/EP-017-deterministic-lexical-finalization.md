@@ -1,10 +1,10 @@
 ---
 id: EP-017
 title: Deterministic Lexical Finalization and Human Review
-status: planned
+status: complete
 owner: claude
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-08-13
 ---
 
 # EP-017: Deterministic Lexical Finalization
@@ -83,19 +83,37 @@ artifact in place.
 
 ## Progress
 
-- [ ] M1
-- [ ] M2
-- [ ] M3
-- [ ] M4
+- [x] M1
+- [x] M2
+- [x] M3
+- [x] M4
 
 ## Surprises & Discoveries
 
-Record lexical coverage, license, and ambiguity findings.
+- Partial-merge code performed lexicon I/O in the domain layer and the CLI
+  called a proposal function without its required context and span inputs.
+- Candidate generation omitted preference/glossary-only surfaces, multiword
+  precedence, punctuation-safe offsets, and common silent-e inflections.
+- The review CLI expected a nonexistent mutable journal API; accepted-change
+  fact/citation revalidation was not represented explicitly.
 
 ## Decision Log
 
-Record rule precedence, resource, and review decisions.
+- Load bundled lexicons only through infra and validate resource payloads
+  before constructing immutable domain rules.
+- Resolve multiword candidates first, treat equal-precedence conflicting senses
+  as ambiguity/no-op, preserve punctuation offsets, and fail on document hash
+  drift before applying changes.
+- Persist append-only review history, compact latest decisions into the domain
+  journal for validation, and do not mutate source documents from accept/reject.
+- Provide count-only fact/citation drift findings alongside structure
+  revalidation so later application paths can fail closed without logging text.
+- Extend `COMMANDS.md` with scoped pytest and selected-file Ruff-fix diagnostics
+  used by the anti-fixation workflow; no runtime interface changed.
 
 ## Outcomes & Retrospective
 
-Complete at the boundary with deterministic replay and review evidence.
+Complete. Lexical proposals and review journals replay deterministically,
+protected spans and ambiguity gates are enforced, and explicit facts,
+citations, and structure revalidation contracts are covered. Full verification
+passes with 1948 tests passed, 15 skipped, 86.35% coverage, and `verify: ok`.

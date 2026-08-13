@@ -1,0 +1,26 @@
+{
+  "schema": "beacon-trusted-source-tiers",
+  "schema_version": 1,
+  "tiers": {
+    "tier1_official_spec": {
+      "description": "Official standard or vendor specification.",
+      "provenance": "curated-in-repo"
+    },
+    "tier2_peer_reviewed": {
+      "description": "Peer-reviewed primary research.",
+      "provenance": "curated-in-repo"
+    },
+    "tier3_preprint_or_release_notes": {
+      "description": "Primary preprint or official release notes.",
+      "provenance": "curated-in-repo"
+    },
+    "tier4_technical_analysis": {
+      "description": "Reputable technical analysis.",
+      "provenance": "curated-in-repo"
+    },
+    "tier5_community_lead": {
+      "description": "Community report used only as a lead.",
+      "provenance": "curated-in-repo"
+    }
+  }
+}

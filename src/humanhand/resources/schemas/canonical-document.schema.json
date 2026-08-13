@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://humanhand.local/schemas/canonical-document.schema.json",
+  "title": "CanonicalDocument",
+  "description": "Deterministic canonical evidence for one imported document. Equal input bytes, parser name/version, policy version, lane, and revision policy produce byte-identical JSON.",
+  "type": "object",
+  "required": [
+    "schema",
+    "schema_version",
+    "lane",
+    "parser",
+    "policy_version",
+    "revision_policy",
+    "surface_text",
+    "canonical_text",
+    "nodes",
+    "findings"
+  ],
+  "properties": {
+    "schema": { "const": "canonical-document" },
+    "schema_version": { "const": 1 },
+    "lane": { "enum": ["source", "style"] },
+    "parser": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "policy_version": { "type": "string" },
+    "revision_policy": { "enum": ["review_required", "reject"] },
+    "surface_text": { "type": "string" },
+    "canonical_text": { "type": "string" },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "parent_id",
+          "type",
+          "position",
+          "source_location",
+          "text",
+          "text_canonical",
+          "attributes",
+          "authorship_class",
+          "protected_span_refs",
+          "finding_codes"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "parent_id": { "type": ["string", "null"] },
+          "type": {
+            "enum": [
+              "document",
+              "section",
+              "heading",
+              "paragraph",
+              "sentence",
+              "text_run",
+              "list",
+              "list_item",
+              "table",
+              "table_row",
+              "table_cell",
+              "quotation",
+              "citation",
+              "footnote",
+              "endnote",
+              "code_block",
+              "hyperlink",
+              "page_break",
+              "section_break",
+              "image_placeholder"
+            ]
+          },
+          "position": { "type": "integer", "minimum": 1 },
+          "source_location": {
+            "type": "object",
+            "required": ["start_offset", "end_offset", "line_start", "line_end"],
+            "properties": {
+              "start_offset": { "type": "integer", "minimum": 0 },
+              "end_offset": { "type": "integer", "minimum": 0 },
+              "line_start": { "type": "integer", "minimum": 1 },
+              "line_end": { "type": "integer", "minimum": 1 }
+            },
+            "additionalProperties": false
+          },
+          "text": { "type": "string" },
+          "text_canonical": { "type": "string" },
+          "attributes": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "authorship_class": { "type": ["string", "null"] },
+          "protected_span_refs": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "finding_codes": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "severity", "category", "description", "evidence", "location"],
+        "properties": {
+          "code": { "type": "string" },
+          "severity": { "enum": ["info", "warning", "error"] },
+          "category": {
+            "enum": [
+              "encoding",
+              "magic_mismatch",
+              "active_content",
+              "external_relationship",
+              "resource_limit",
+              "unsupported_feature",
+              "structure",
+              "metadata",
+              "revision",
+              "worker"
+            ]
+          },
+          "description": { "type": "string" },
+          "evidence": { "type": "string" },
+          "location": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["start_offset", "end_offset", "line_start", "line_end"],
+                "properties": {
+                  "start_offset": { "type": "integer", "minimum": 0 },
+                  "end_offset": { "type": "integer", "minimum": 0 },
+                  "line_start": { "type": "integer", "minimum": 1 },
+                  "line_end": { "type": "integer", "minimum": 1 }
+                },
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

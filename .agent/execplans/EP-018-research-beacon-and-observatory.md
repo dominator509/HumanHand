@@ -1,10 +1,10 @@
 ---
 id: EP-018
 title: Research Beacon and Scanner Observatory
-status: planned
+status: complete
 owner: claude
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-08-13
 ---
 
 # EP-018: Research Beacon and Scanner Observatory
@@ -83,19 +83,39 @@ modify production files from a research result.
 
 ## Progress
 
-- [ ] M1
-- [ ] M2
-- [ ] M3
-- [ ] M4
+- [x] M1
+- [x] M2
+- [x] M3
+- [x] M4
 
 ## Surprises & Discoveries
 
-Record provider documentation, source-trust, and scanner drift findings.
+- Beacon CLI module names and store methods did not match the implemented flat
+  domain modules, causing the real lifecycle tests to skip rather than run.
+- Policy resources lacked strict schema/provenance validation, proposal
+  evidence was not required for non-high-impact work, and source-tier strings
+  disagreed with the domain enum.
+- ZDR compliance was inferred from a model-name substring, which was not valid
+  evidence of endpoint policy.
 
 ## Decision Log
 
-Record provider, network gate, source-tier, and policy decisions.
+- Wire the CLI to the actual deterministic trigger, snapshot, source registry,
+  and schema-valid proposal-store contracts; keep incomplete installs fail closed.
+- Re-run bundled policy review at approval time, preserve append-only decisions,
+  and refuse blocked, unknown, malformed, or unreviewed payloads.
+- Require exact policy schemas and curated provenance, all mandatory blocked
+  actions, evidence for every proposal, and serialized enum-compatible tiers.
+- Require an explicit operator-supplied set of ZDR-compliant models; provider
+  results require nonempty findings, HTTPS evidence URLs, and confidence in [0,1].
+- Update the program tracker after validation to remove its duplicate EP-016 row
+  and identify EP-019 as the next, not-yet-started seam.
 
 ## Outcomes & Retrospective
 
-Complete at the boundary with evidence traceability and blocked-action tests.
+Complete. Offline snapshots are traceable to investigations, source reporting
+uses the registered public evidence set, policy approval is re-evaluated through
+the firewall, scanner runs remain synthetic/offline by default, and live research
+remains explicitly gated. The importer bundle passes 280 tests with 4 conditional
+skips; full verification passes 1948 tests with 15 skips, 86.35% coverage, and
+`verify: ok`.
