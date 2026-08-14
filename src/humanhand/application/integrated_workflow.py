@@ -176,9 +176,7 @@ def _claim_from_row(row: dict[str, object]) -> ClaimV2:
             negation=bool(row["negation"]),
             attribution=str(row.get("attribution") or ""),
             source_evidence_refs=(),
-            confidence=(
-                float(row["confidence"]) if row.get("confidence") is not None else None
-            ),
+            confidence=(float(row["confidence"]) if row.get("confidence") is not None else None),
             status=ClaimStatus(str(row["status"])),
             contradictions=(),
             allowed_paraphrase_scope=str(row["paraphrase_scope"]),
@@ -236,9 +234,7 @@ def load_document_state(
         )
     document = content.canonical_document
     claims = tuple(_claim_from_row(row) for row in store.load_claims(document_id))
-    spans = tuple(
-        _protected_span_from_row(row) for row in store.load_protected_spans(document_id)
-    )
+    spans = tuple(_protected_span_from_row(row) for row in store.load_protected_spans(document_id))
     entities = tuple(_entity_from_row(row) for row in store.load_entities(document_id))
     citations = extract_citations(document.nodes)
     return LoadedDocumentState(
