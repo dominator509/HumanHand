@@ -1,3 +1,3 @@
 """HumanHand — local-first style fidelity, fact integrity, and clean-room documents."""
 
-__version__ = "1.1.0rc1"
+__version__ = "1.1.0"
