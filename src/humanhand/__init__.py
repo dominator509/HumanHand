@@ -1,3 +1,3 @@
-"""Human Hand — privacy-preserving CLI for rewriting AI-assisted text into human style."""
+"""HumanHand — local-first style fidelity, fact integrity, and clean-room documents."""
 
-__version__ = "1.0.0"
+__version__ = "1.1.0rc1"
