@@ -117,25 +117,28 @@ def _resolved(reader: PdfReader, obj: object) -> object:
 
 def _metadata_findings(reader: PdfReader) -> tuple[ArtifactFinding, ...]:
     findings: list[ArtifactFinding] = []
+    metadata_present = False
     try:
-        metadata = reader.metadata
+        metadata_present = bool(reader.metadata)
     except PyPdfError:
-        metadata = {"unreadable": True}
-    if metadata:
+        metadata_present = True
+    if metadata_present:
         findings.append(
             ArtifactFinding(
                 code=AuditCode.METADATA_PROHIBITED,
                 severity=ArtifactFindingSeverity.ERROR,
-                description="PDF /Info metadata dictionary is present",
+                description="PDF /Info metadata dictionary is present or unreadable",
                 evidence="trailer=/Info",
             )
         )
+
+    xmp_present = False
     try:
-        xmp = reader.xmp_metadata
+        xmp_present = reader.xmp_metadata is not None
     except PyPdfError:
-        xmp = object()
+        xmp_present = True
     root = _resolved(reader, reader.trailer.get("/Root"))
-    if xmp is not None or (isinstance(root, dict) and "/Metadata" in root):
+    if xmp_present or (isinstance(root, dict) and "/Metadata" in root):
         findings.append(
             ArtifactFinding(
                 code=AuditCode.METADATA_PROHIBITED,
