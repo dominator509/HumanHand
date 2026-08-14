@@ -187,11 +187,20 @@ class IntegratedProjectStore(ProjectStore):
         _ = content.canonical_document
         return content
 
-    def save_protected_spans(self, document_id: str, spans: tuple[ProtectedSpan, ...]) -> None:
-        """Replace protected spans while encoding their exact source text."""
+    def save_protected_spans(self, document_id: str, spans: tuple[object, ...]) -> None:
+        """Replace protected spans while encoding their exact source text.
+
+        The signature remains substitutable with ``ProjectStore``. Non-domain
+        span objects fail closed instead of being accepted through duck typing.
+        """
+        validated: list[ProtectedSpan] = []
+        for item in spans:
+            if not isinstance(item, ProtectedSpan):
+                raise ProjectStoreError("Integrated store requires ProtectedSpan objects")
+            validated.append(item)
         with self._write() as connection:
             connection.execute("DELETE FROM protected_spans WHERE document_id = ?", (document_id,))
-            for span in spans:
+            for span in validated:
                 connection.execute(
                     """INSERT INTO protected_spans
                        (span_id, document_id, kind, text, start_offset, end_offset)
