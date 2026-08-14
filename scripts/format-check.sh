@@ -16,6 +16,8 @@ if [ ! -f pyproject.toml ]; then
   exit 1
 fi
 
-sh scripts/uv.sh run ruff format --check .
+# --diff keeps this a read-only gate while making CI provide the exact
+# canonical formatter patch during the EP-019 review cycle.
+sh scripts/uv.sh run ruff format --check --diff .
 
 echo "format check: ok"
