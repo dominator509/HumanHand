@@ -8,3 +8,8 @@
 *.yaml text eol=lf
 *.json text eol=lf
 *.env text eol=lf
+
+# These fixtures intentionally exercise non-LF input and must not be normalized
+# by Git on checkout.
+tests/fixtures/import/crlf.txt -text
+tests/fixtures/import/mixed-endings.txt -text
