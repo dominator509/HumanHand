@@ -1,14 +1,14 @@
 [project]
 name = "humanhand"
-version = "1.0.0"
-description = "Privacy-preserving CLI for rewriting AI-assisted text into human style"
+version = "1.1.0rc1"
+description = "Local-first document style fidelity, fact integrity, and clean-room import/export CLI"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 authors = [
     {name = "dominator509"}
 ]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: End Users/Desktop",
     "Operating System :: Microsoft :: Windows",
@@ -16,7 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Topic :: Text Processing",
 ]
-keywords = ["ai-detection", "text-rewriting", "privacy", "cli"]
+keywords = ["style-fidelity", "fact-integrity", "privacy", "clean-room", "cli"]
 dependencies = [
     "typer>=0.12,<1",
     "httpx>=0.27,<1",
@@ -47,7 +47,7 @@ Homepage = "https://github.com/dominator509/humanhand"
 Repository = "https://github.com/dominator509/humanhand"
 
 [project.scripts]
-humanhand = "humanhand.cli.app:app"
+humanhand = "humanhand.cli.root_app:app"
 
 [build-system]
 requires = ["hatchling"]
