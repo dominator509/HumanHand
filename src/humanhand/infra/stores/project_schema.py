@@ -1,19 +1,23 @@
-"""Versioned SQLite schema for the local project store (EP-015, ADR-001).
+"""Versioned SQLite schema for the local project store (EP-015/EP-019).
 
 Each entry in ``MIGRATIONS`` is ``(version, DDL script)``. Version 2 scopes
 document-local record ids with composite keys so deterministic ids can repeat
-across documents. Scripts are made of
-independent statements terminated by semicolons; the migration runner executes
-each statement inside its own explicit transaction so DDL is fully rollbackable.
+across documents. Version 3 adds immutable revision content so context,
+finalization, and export operate on the accepted project revision rather than
+requiring the original import package again.
 
-Sensitive columns (``claims.proposition``, ``entities.name``) hold application-
-layer encrypted text when the store is opened with encryption enabled. The
-database schema itself never stores secrets.
+Scripts are made of independent statements terminated by semicolons; the
+migration runner executes each statement inside its own explicit transaction
+so DDL is fully rollbackable.
+
+Sensitive columns hold application-layer encrypted text when the store is
+opened with encryption enabled. The database schema itself never stores keys
+or provider secrets.
 """
 
 from __future__ import annotations
 
-PROJECT_SCHEMA_VERSION = 2
+PROJECT_SCHEMA_VERSION = 3
 
 MIGRATIONS: tuple[tuple[int, str], ...] = (
     (
@@ -174,6 +178,26 @@ CREATE TABLE relationships (
 );
 INSERT INTO relationships SELECT * FROM relationships_v1;
 DROP TABLE relationships_v1;
+""",
+    ),
+    (
+        3,
+        """
+CREATE TABLE revision_contents (
+    document_id TEXT NOT NULL,
+    revision_id TEXT NOT NULL,
+    accepted_text TEXT NOT NULL,
+    canonical_document_json TEXT NOT NULL,
+    style_profile_id TEXT NOT NULL DEFAULT '',
+    finalization_run_id TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (document_id, revision_id),
+    FOREIGN KEY (document_id, revision_id)
+        REFERENCES document_revisions(document_id, revision_id)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX idx_revision_contents_document
+ON revision_contents(document_id, revision_id);
 """,
     ),
 )
