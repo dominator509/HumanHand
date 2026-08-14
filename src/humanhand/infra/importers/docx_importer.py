@@ -182,9 +182,7 @@ class DocxImporter(ContainerImporter):
                 coverage = CoverageSummary(
                     adapter=self.parser_name,
                     supported_structures=supported,
-                    unsupported_structures=(
-                        _DOCX_STYLE_GAPS if policy.lane == "style" else ()
-                    ),
+                    unsupported_structures=(_DOCX_STYLE_GAPS if policy.lane == "style" else ()),
                     status=("partial" if policy.lane == "style" else "complete"),
                 )
 
