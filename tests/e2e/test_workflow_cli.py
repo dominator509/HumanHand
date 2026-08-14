@@ -64,9 +64,7 @@ def test_complete_workflow_cli_lifecycle(tmp_path: Path) -> None:
             store=store,
         )
         block_id = next(
-            node.node_id
-            for node in loaded.document.nodes
-            if node.node_type is NodeType.PARAGRAPH
+            node.node_id for node in loaded.document.nodes if node.node_type is NodeType.PARAGRAPH
         )
     finally:
         store.close()
