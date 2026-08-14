@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 import pytest
+from click import unstyle
 from typer.testing import CliRunner, Result
 
 from humanhand.cli.app import app
@@ -146,14 +147,15 @@ class TestImportInspectHelp:
     def test_import_help(self) -> None:
         result = runner.invoke(app, ["import", "--help"])
         assert result.exit_code == 0
-        assert "inspect" in result.stdout
+        assert "inspect" in unstyle(result.stdout)
 
     def test_inspect_help(self) -> None:
         result = runner.invoke(app, ["import", "inspect", "--help"])
         assert result.exit_code == 0
-        assert "--json" in result.stdout
-        assert "--lane" in result.stdout
-        assert "--content" in result.stdout
+        help_text = unstyle(result.stdout)
+        assert "--json" in help_text
+        assert "--lane" in help_text
+        assert "--content" in help_text
 
     def test_inspect_requires_path(self) -> None:
         result = runner.invoke(app, ["import", "inspect"])
