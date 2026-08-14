@@ -2,7 +2,7 @@
 
 This command family is the production path. Legacy commands remain available
 for compatibility, while workflow commands operate only on persisted accepted
-revisions and a single resolved privacy runtime.
+revisions and one resolved privacy runtime.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from humanhand.application.integrated_workflow import (
 )
 from humanhand.application.style_services import packages_for_label
 from humanhand.domain.artifact_findings import ArtifactAuditStatus
+from humanhand.domain.canonical_document import CanonicalDocument
 from humanhand.domain.context_capsule import capsule_to_payload
 from humanhand.domain.document_nodes import NodeType
 from humanhand.domain.document_serialization import dumps_stable
@@ -43,12 +44,7 @@ from humanhand.domain.types import DomainError
 from humanhand.infra.auditors import audit_artifact
 from humanhand.infra.config import Config, load_config
 from humanhand.infra.exporters import get_exporter
-from humanhand.infra.files import (
-    FileIOError,
-    file_size,
-    read_bytes,
-    read_head_bytes,
-)
+from humanhand.infra.files import FileIOError, file_size, read_bytes, read_head_bytes
 from humanhand.infra.importers.pipeline import SandboxedImportInspector
 from humanhand.infra.lexicons.lexicon_loader import load_bundled_rules
 from humanhand.infra.privacy.runtime import (
@@ -70,8 +66,6 @@ from humanhand.infra.stores.project_store import ProjectStoreError
 EXIT_INPUT_ERROR = 1
 EXIT_CONFIG_ERROR = 2
 EXIT_IO_ERROR = 3
-EXIT_SCHEMA_ERROR = 5
-EXIT_INTERNAL_ERROR = 6
 
 _WORKFLOW_REPORTS = "workflow"
 
@@ -95,7 +89,8 @@ class _Reader:
 
 def _error(message: str, code: int, json_mode: bool) -> NoReturn:
     if json_mode:
-        print(json.dumps({"status": "error", "message": message, "exit_code": code}, sort_keys=True))
+        payload = {"status": "error", "message": message, "exit_code": code}
+        print(json.dumps(payload, sort_keys=True))
     else:
         print(f"error: {message}", file=sys.stderr)
     raise typer.Exit(code)
@@ -151,9 +146,7 @@ def _profile(
     packages = packages_for_label(vault.list_packages(), vault, profile_id)
     profile = build_profile(profile_id=profile_id, packages=packages)
     if require_complete and profile.status != "complete":
-        raise DomainError(
-            f"Style profile {profile_id!r} is not complete: {profile.status}"
-        )
+        raise DomainError(f"Style profile {profile_id!r} is not complete: {profile.status}")
     return profile
 
 
@@ -200,10 +193,21 @@ def _review_path(layout: ProjectLayout, run_id: str) -> Path:
 
 @workflow_app.command("ingest")
 def ingest_cmd(
-    source: str = typer.Argument(..., help="Source document in any supported clean-room format."),
+    source: str = typer.Argument(
+        ...,
+        help="Source document in any supported clean-room format.",
+    ),
     project: str = typer.Option(..., "--project", help="Project directory."),
-    name: str | None = typer.Option(None, "--name", help="Name used when initializing a new project."),
-    style_profile: str | None = typer.Option(None, "--style-profile", help="Complete style profile to bind."),
+    name: str | None = typer.Option(
+        None,
+        "--name",
+        help="Name used when initializing a new project.",
+    ),
+    style_profile: str | None = typer.Option(
+        None,
+        "--style-profile",
+        help="Complete style profile to bind.",
+    ),
     json_mode: bool = typer.Option(False, "--json"),
 ) -> None:
     """Clean-import a source and persist its initial accepted revision."""
@@ -231,7 +235,8 @@ def ingest_cmd(
             ImportStatus.FINDINGS,
         }:
             raise DomainError(
-                f"Source import is not eligible for ingest: {imported.inspection.status.value}"
+                "Source import is not eligible for ingest: "
+                f"{imported.inspection.status.value}"
             )
         state = _project_state(root)
         if style_profile is not None:
@@ -274,7 +279,10 @@ def ingest_cmd(
 
 @workflow_app.command("bind-style")
 def bind_style_cmd(
-    profile_id: str = typer.Argument(..., help="Reviewed complete Style Fidelity profile."),
+    profile_id: str = typer.Argument(
+        ...,
+        help="Reviewed complete Style Fidelity profile.",
+    ),
     project: str = typer.Option(..., "--project"),
     json_mode: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -292,7 +300,13 @@ def bind_style_cmd(
             store.close()
     except (DomainError, ProjectStoreError) as exc:
         _error(str(exc), EXIT_INPUT_ERROR, json_mode)
-    _json({"status": "ok", "project_id": state.project_id, "style_profile": profile.profile_id})
+    _json(
+        {
+            "status": "ok",
+            "project_id": state.project_id,
+            "style_profile": profile.profile_id,
+        }
+    )
 
 
 @workflow_app.command("context")
@@ -300,7 +314,11 @@ def context_cmd(
     project: str = typer.Option(..., "--project"),
     document_id: str = typer.Option(..., "--document"),
     block_id: str = typer.Option(..., "--block"),
-    include_content: bool = typer.Option(False, "--include-content", help="Print the content-bearing capsule."),
+    include_content: bool = typer.Option(
+        False,
+        "--include-content",
+        help="Print the content-bearing capsule.",
+    ),
     json_mode: bool = typer.Option(False, "--json"),
 ) -> None:
     """Build context from the accepted revision and bound style profile."""
@@ -416,8 +434,9 @@ def decide_cmd(
         effective: dict[str, str] = {}
         if path.is_file():
             prior = review_from_payload(_read_payload(path))
-            effective.update(item.change_id_and_decision for item in ())  # unreachable typing seam
-            effective.update({item.change_id: item.decision for item in prior.decisions})
+            effective.update(
+                {item.change_id: item.decision for item in prior.decisions}
+            )
         effective[change_id] = decision
         ordered = tuple(
             ReviewDecision(change.change_id, effective[change.change_id])
@@ -426,7 +445,7 @@ def decide_cmd(
         )
         journal = build_review_journal(run_id, ordered)
         _write_payload(path, review_to_payload(journal))
-    except (DomainError, AttributeError) as exc:
+    except DomainError as exc:
         _error(str(exc), EXIT_INPUT_ERROR, json_mode)
     except OSError as exc:
         _error(str(exc), EXIT_IO_ERROR, json_mode)
@@ -492,16 +511,15 @@ def apply_cmd(
     )
 
 
-def _sections(document: object) -> tuple[str, ...]:
+def _sections(document: CanonicalDocument) -> tuple[str, ...]:
     values = tuple(
         node.text
-        for node in getattr(document, "nodes", ())
+        for node in document.nodes
         if node.node_type is NodeType.PARAGRAPH and node.text
     )
     if values:
         return values
-    surface = str(getattr(document, "surface_text", ""))
-    return tuple(part for part in surface.split("\n\n") if part)
+    return tuple(part for part in document.surface_text.split("\n\n") if part)
 
 
 @workflow_app.command("export")
@@ -514,7 +532,7 @@ def export_cmd(
     json_mode: bool = typer.Option(False, "--json"),
 ) -> None:
     """Export and independently audit the latest accepted revision."""
-    config, runtime = _load_runtime(json_mode)
+    _config, runtime = _load_runtime(json_mode)
     root = _project_root(project)
     _require_layout(root, json_mode)
     state = _project_state(root)
@@ -586,7 +604,9 @@ def status_cmd(
                         "document_id": document_id,
                         "accepted_revision": revision.revision_id if revision else None,
                         "content_persisted": content is not None,
-                        "finalization_run_id": content.finalization_run_id if content else "",
+                        "finalization_run_id": (
+                            content.finalization_run_id if content else ""
+                        ),
                     }
                 )
             style_profile = store.project_style_profile(state.project_id)
