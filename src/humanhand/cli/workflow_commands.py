@@ -235,8 +235,7 @@ def ingest_cmd(
             ImportStatus.FINDINGS,
         }:
             raise DomainError(
-                "Source import is not eligible for ingest: "
-                f"{imported.inspection.status.value}"
+                f"Source import is not eligible for ingest: {imported.inspection.status.value}"
             )
         state = _project_state(root)
         if style_profile is not None:
@@ -434,9 +433,7 @@ def decide_cmd(
         effective: dict[str, str] = {}
         if path.is_file():
             prior = review_from_payload(_read_payload(path))
-            effective.update(
-                {item.change_id: item.decision for item in prior.decisions}
-            )
+            effective.update({item.change_id: item.decision for item in prior.decisions})
         effective[change_id] = decision
         ordered = tuple(
             ReviewDecision(change.change_id, effective[change.change_id])
@@ -513,9 +510,7 @@ def apply_cmd(
 
 def _sections(document: CanonicalDocument) -> tuple[str, ...]:
     values = tuple(
-        node.text
-        for node in document.nodes
-        if node.node_type is NodeType.PARAGRAPH and node.text
+        node.text for node in document.nodes if node.node_type is NodeType.PARAGRAPH and node.text
     )
     if values:
         return values
@@ -604,9 +599,7 @@ def status_cmd(
                         "document_id": document_id,
                         "accepted_revision": revision.revision_id if revision else None,
                         "content_persisted": content is not None,
-                        "finalization_run_id": (
-                            content.finalization_run_id if content else ""
-                        ),
+                        "finalization_run_id": (content.finalization_run_id if content else ""),
                     }
                 )
             style_profile = store.project_style_profile(state.project_id)
