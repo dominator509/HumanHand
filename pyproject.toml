@@ -1,6 +1,6 @@
 [project]
 name = "humanhand"
-version = "1.1.0rc1"
+version = "1.1.0"
 description = "Local-first document style fidelity, fact integrity, and clean-room import/export CLI"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
