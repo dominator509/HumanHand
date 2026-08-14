@@ -4,13 +4,13 @@ The EP-015 :class:`~humanhand.infra.stores.project_store.ProjectStore`
 persists revision metadata, facts, entities, relationships, and approvals.
 This extension persists the actual accepted text and canonical document JSON
 for every immutable revision. It closes the central integration gap: context,
-finalization, and export can now load the accepted project revision directly
-instead of requiring the original source-package file again.
+finalization, and export load the accepted project revision directly.
 
 Sensitive content uses the parent store's application-layer codec whenever
 encryption is enabled. Revision-content rows are write-once: an idempotent
 repeat with identical values is accepted, while a conflicting repeat fails
-closed.
+closed. Protected-span text is also encoded here so strict/regulated workflows
+do not retain those source fragments in plaintext.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from dataclasses import dataclass
 
 from humanhand.domain.canonical_document import CanonicalDocument
 from humanhand.domain.document_serialization import document_from_json
+from humanhand.domain.protected_spans import ProtectedSpan
 from humanhand.domain.revisions import DocumentRevision, RevisionStatus
 from humanhand.infra.stores.project_store import ProjectStore, ProjectStoreError
 
@@ -97,9 +98,7 @@ class IntegratedProjectStore(ProjectStore):
             (revision.document_id, revision.revision_id),
         ).fetchone()
         if revision_row is None:
-            raise ProjectStoreError(
-                "Revision metadata must be stored before revision content"
-            )
+            raise ProjectStoreError("Revision metadata must be stored before revision content")
         if str(revision_row[0]) != digest:
             raise ProjectStoreError("Stored revision metadata hash does not match content")
 
@@ -187,6 +186,46 @@ class IntegratedProjectStore(ProjectStore):
             raise ProjectStoreError("Stored revision content failed its sha256 integrity check")
         _ = content.canonical_document
         return content
+
+    def save_protected_spans(
+        self, document_id: str, spans: tuple[ProtectedSpan, ...]
+    ) -> None:
+        """Replace protected spans while encoding their exact source text."""
+        with self._write() as connection:
+            connection.execute("DELETE FROM protected_spans WHERE document_id = ?", (document_id,))
+            for span in spans:
+                connection.execute(
+                    """INSERT INTO protected_spans
+                       (span_id, document_id, kind, text, start_offset, end_offset)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        span.span_id,
+                        document_id,
+                        span.kind.value,
+                        self._encode(span.text),
+                        span.source_location.start_offset,
+                        span.source_location.end_offset,
+                    ),
+                )
+
+    def load_protected_spans(self, document_id: str) -> tuple[dict[str, object], ...]:
+        """Load protected spans, decoding text when encryption is active."""
+        rows = self._connection.execute(
+            """SELECT span_id, document_id, kind, text, start_offset, end_offset
+               FROM protected_spans WHERE document_id = ? ORDER BY span_id""",
+            (document_id,),
+        ).fetchall()
+        return tuple(
+            {
+                "span_id": row[0],
+                "document_id": row[1],
+                "kind": row[2],
+                "text": self._decode(str(row[3])),
+                "start_offset": row[4],
+                "end_offset": row[5],
+            }
+            for row in rows
+        )
 
     def bind_style_profile(self, project_id: str, profile_label: str) -> None:
         """Bind a reviewed style profile label to a project."""
