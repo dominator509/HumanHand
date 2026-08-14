@@ -43,7 +43,7 @@ class PdfAuditor(BaseAuditor):
         raw = read_file_bytes(path)
         try:
             reader = PdfReader(io.BytesIO(raw), strict=True)
-        except PdfError as exc:
+        except PyPdfError as exc:
             return build_report(
                 self.format,
                 (
@@ -60,7 +60,7 @@ class PdfAuditor(BaseAuditor):
         extraction_ok = True
         try:
             extracted = "\n".join((page.extract_text() or "") for page in reader.pages)
-        except PdfError as exc:
+        except PyPdfError as exc:
             extraction_ok = False
             findings.append(
                 ArtifactFinding(
@@ -119,7 +119,7 @@ def _metadata_findings(reader: PdfReader) -> tuple[ArtifactFinding, ...]:
     findings: list[ArtifactFinding] = []
     try:
         metadata = reader.metadata
-    except PdfError:
+    except PyPdfError:
         metadata = {"unreadable": True}
     if metadata:
         findings.append(
@@ -132,7 +132,7 @@ def _metadata_findings(reader: PdfReader) -> tuple[ArtifactFinding, ...]:
         )
     try:
         xmp = reader.xmp_metadata
-    except PdfError:
+    except PyPdfError:
         xmp = object()
     root = _resolved(reader, reader.trailer.get("/Root"))
     if xmp is not None or (isinstance(root, dict) and "/Metadata" in root):
@@ -193,7 +193,7 @@ def _active_content_present_local(reader: PdfReader) -> tuple[bool, bool]:
                 stack.extend(obj.values())
             elif isinstance(obj, (list, tuple)):
                 stack.extend(obj)
-    except PdfError:
+    except PyPdfError:
         return True, True
     if stack:
         return True, True
