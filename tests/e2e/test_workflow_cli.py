@@ -219,7 +219,7 @@ def test_complete_workflow_cli_lifecycle(tmp_path: Path) -> None:
     assert status.exit_code == 0, status.stderr
     status_result = _json_output(status.stdout)
     assert status_result["project_id"] == project_id
-    assert status_result["style_profile"] is None
+    assert status_result["style_profile"] == ""
     assert status_result["documents"] == [
         {
             "accepted_revision": application["revision_id"],
