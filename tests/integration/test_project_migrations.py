@@ -1,10 +1,4 @@
-"""Integration tests for versioned migrations and rollback (EP-015).
-
-Covers the fresh-open path, reopen idempotence, legacy database migration,
-byte-exact rollback from the sidecar backup, the missing-backup refusal, and
-transactional DDL: a failing migration rolls back completely and leaves the
-database at the last good version.
-"""
+"""Integration tests for versioned project migrations and rollback."""
 
 from __future__ import annotations
 
@@ -21,7 +15,7 @@ from humanhand.infra.stores.migration_runner import (
     rollback_from_backup,
 )
 from humanhand.infra.stores.project_layout import init_layout, layout_for
-from humanhand.infra.stores.project_schema import MIGRATIONS
+from humanhand.infra.stores.project_schema import MIGRATIONS, PROJECT_SCHEMA_VERSION
 from humanhand.infra.stores.project_store import ProjectStore
 
 
@@ -40,6 +34,7 @@ _EXPECTED_TABLES = {
     "projects",
     "documents",
     "document_revisions",
+    "revision_contents",
     "protected_spans",
     "claims",
     "entities",
@@ -57,8 +52,8 @@ class TestApplyMigrations:
         try:
             assert current_version(conn) == 0
             final = apply_migrations(conn, backup_path=backup)
-            assert final == 2
-            assert current_version(conn) == 2
+            assert final == PROJECT_SCHEMA_VERSION
+            assert current_version(conn) == PROJECT_SCHEMA_VERSION
             assert _tables(conn) == _EXPECTED_TABLES
         finally:
             conn.close()
@@ -75,7 +70,7 @@ class TestApplyMigrations:
         backup_bytes = backup.read_bytes()
         conn = _open_connection(tmp_path)
         try:
-            assert apply_migrations(conn, backup_path=backup) == 2
+            assert apply_migrations(conn, backup_path=backup) == PROJECT_SCHEMA_VERSION
         finally:
             conn.close()
         assert backup.read_bytes() == backup_bytes
@@ -91,8 +86,8 @@ class TestApplyMigrations:
         backup = db.with_name("project.db.bak")
         conn = _open_connection(tmp_path)
         try:
-            assert apply_migrations(conn, backup_path=backup) == 2
-            assert {"schema_migrations", "legacy_notes"} <= _tables(conn)
+            assert apply_migrations(conn, backup_path=backup) == PROJECT_SCHEMA_VERSION
+            assert {"schema_migrations", "legacy_notes", "revision_contents"} <= _tables(conn)
             row = conn.execute("SELECT note FROM legacy_notes").fetchone()
             assert row == ("keep me",)
         finally:
@@ -113,7 +108,7 @@ class TestRollback:
         before = db.read_bytes()
         conn = _open_connection(tmp_path)
         try:
-            assert apply_migrations(conn, backup_path=backup) == 2
+            assert apply_migrations(conn, backup_path=backup) == PROJECT_SCHEMA_VERSION
         finally:
             conn.close()
         after = db.read_bytes()
@@ -140,7 +135,7 @@ class TestMigrationFailure:
     ) -> None:
         init_layout(tmp_path, name="test-project")
         broken = (
-            3,
+            PROJECT_SCHEMA_VERSION + 1,
             "CREATE TABLE broken (id INTEGER PRIMARY KEY); THIS IS NOT VALID SQL;",
         )
         monkeypatch.setattr(migration_runner_module, "MIGRATIONS", MIGRATIONS + (broken,))
@@ -148,7 +143,7 @@ class TestMigrationFailure:
             ProjectStore(tmp_path)
         conn = sqlite3.connect(str(layout_for(tmp_path).database))
         try:
-            assert current_version(conn) == 2
+            assert current_version(conn) == PROJECT_SCHEMA_VERSION
             assert "broken" not in _tables(conn)
         finally:
             conn.close()
@@ -179,8 +174,9 @@ class TestUpgradeFromV1:
         monkeypatch.setattr(migration_runner_module, "MIGRATIONS", MIGRATIONS)
         conn = _open_connection(tmp_path)
         try:
-            assert apply_migrations(conn, backup_path=backup) == 2
+            assert apply_migrations(conn, backup_path=backup) == PROJECT_SCHEMA_VERSION
             assert conn.execute("SELECT proposition FROM claims").fetchone() == ("keep me",)
+            assert "revision_contents" in _tables(conn)
         finally:
             conn.close()
         backup_conn = sqlite3.connect(str(backup))

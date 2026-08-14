@@ -1,13 +1,7 @@
-"""Markdown artifact auditor (EP-016).
+"""Content-only Markdown artifact auditor (EP-019).
 
-Inherits every TXT-lane check from :class:`TextAuditor` (UTF-8 no BOM,
-one trailing newline, no CR, ordered section containment, prohibited
-metadata scan) and adds the Markdown-specific checks:
-
-- a ``# `` title heading is present,
-- a ``## Claims`` section is present iff ``expected.claims`` is
-  non-empty (skipped when no expected document is supplied),
-- no raw HTML active content (``<script`` or ``<iframe``).
+Inherits TXT-lane checks and verifies the approved title, absence of active or
+external Markdown content, and absence of an internal ``Claims`` appendix.
 """
 
 from __future__ import annotations
@@ -22,10 +16,9 @@ from humanhand.domain.artifact_findings import (
 )
 from humanhand.domain.public_document import PublicDocument
 
-from .base import AuditCode, build_report, missing_claim_findings, read_file_bytes
+from .base import AuditCode, build_report, read_file_bytes
 from .text_auditor import TextAuditor
 
-# Raw HTML tags that must never appear in a public Markdown artifact.
 ACTIVE_CONTENT_PATTERNS = (
     re.compile(r"<(?:script|iframe|object|embed|link|img)\b", re.IGNORECASE),
     re.compile(r"\bon[a-z]+\s*=", re.IGNORECASE),
@@ -35,7 +28,7 @@ ACTIVE_CONTENT_PATTERNS = (
 
 
 class MarkdownAuditor(TextAuditor):
-    """Independent auditor for Markdown artifacts (format ``md``)."""
+    """Independent auditor for content-only Markdown artifacts."""
 
     format = "md"
 
@@ -63,40 +56,26 @@ class MarkdownAuditor(TextAuditor):
                     evidence="heading=title",
                 )
             )
-        if expected is not None:
-            if title_headings and expected.title and f"# {expected.title}" not in title_headings:
-                findings.append(
-                    ArtifactFinding(
-                        code=AuditCode.TITLE_MISSING,
-                        severity=ArtifactFindingSeverity.ERROR,
-                        description="Expected title heading is missing from the Markdown artifact",
-                        evidence="heading=expected_title",
-                    )
+        if expected is not None and (
+            title_headings and expected.title and f"# {expected.title}" not in title_headings
+        ):
+            findings.append(
+                ArtifactFinding(
+                    code=AuditCode.TITLE_MISSING,
+                    severity=ArtifactFindingSeverity.ERROR,
+                    description="Expected title heading is missing from the Markdown artifact",
+                    evidence="heading=expected_title",
                 )
-            has_claims = bool(expected.claims)
-            claims_present = "## Claims" in text
-            if has_claims and not claims_present:
-                findings.append(
-                    ArtifactFinding(
-                        code=AuditCode.CLAIMS_HEADING,
-                        severity=ArtifactFindingSeverity.ERROR,
-                        description="'## Claims' section missing but the document declares claims",
-                        evidence="claims_expected=true",
-                    )
+            )
+        if "## Claims" in text:
+            findings.append(
+                ArtifactFinding(
+                    code=AuditCode.CLAIMS_HEADING,
+                    severity=ArtifactFindingSeverity.ERROR,
+                    description="Internal claims appendix must not appear in public Markdown",
+                    evidence="heading=claims",
                 )
-            elif not has_claims and claims_present:
-                findings.append(
-                    ArtifactFinding(
-                        code=AuditCode.CLAIMS_HEADING,
-                        severity=ArtifactFindingSeverity.ERROR,
-                        description=(
-                            "'## Claims' section present but the document declares no claims"
-                        ),
-                        evidence="claims_expected=false",
-                    )
-                )
-            if claims_present:
-                findings.extend(missing_claim_findings(text, expected))
+            )
         for pattern in ACTIVE_CONTENT_PATTERNS:
             if pattern.search(text):
                 findings.append(

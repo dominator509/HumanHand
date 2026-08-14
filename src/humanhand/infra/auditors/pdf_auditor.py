@@ -1,30 +1,8 @@
-"""PDF artifact auditor (EP-016).
+"""Independent metadata-free PDF artifact auditor (EP-019).
 
-Independent audit path: the auditor re-reads the artifact bytes from
-disk and opens the PDF with pypdf (:class:`pypdf.PdfReader`); it shares
-no code with the exporter.
-
-Checks:
-- the bytes open as a valid PDF (``PyPdfError`` fails closed),
-- page text extraction succeeds,
-- the expected title and every expected section text appear in the
-  extracted text, with whitespace collapsed on both sides (documented
-  rule: pypdf may split one visual line across page or layout
-  boundaries, so exact whitespace must not be required),
-- no JavaScript.
-
-JavaScript check scope (LOCAL, documented): this auditor deliberately
-does NOT import ``humanhand.infra.importers.pdf_inspection``; it only
-detects the two standard placements:
-  - catalog ``/Names`` dictionary carrying a ``/JavaScript`` entry,
-  - catalog ``/OpenAction`` whose action dictionary has ``/S
-    /JavaScript``.
-Indirect references are resolved one level with ``reader.get_object``;
-an unresolvable catalog structure is treated as no-JavaScript because
-broken structure is already reported by the open/extract paths. This is
-a narrower check than ``pdf_inspection.javascript_present`` (which also
-covers ``/AA`` and ``/A`` entries); the difference is intentional and
-recorded in the EP-016 Decision Log.
+The auditor re-reads the final bytes with pypdf and fails closed on regular
+metadata, XMP/root metadata, trailer identifiers, JavaScript, attachments,
+forms, rich media, annotations, or missing approved visible content.
 """
 
 from __future__ import annotations
@@ -48,7 +26,6 @@ from .base import (
     BaseAuditor,
     build_report,
     collapse_whitespace,
-    missing_claim_findings,
     missing_section_findings,
     prohibited_term_findings,
     read_file_bytes,
@@ -56,7 +33,7 @@ from .base import (
 
 
 class PdfAuditor(BaseAuditor):
-    """Independent auditor for PDF artifacts (format ``pdf``)."""
+    """Independent auditor for metadata-free PDF artifacts."""
 
     format = "pdf"
 
@@ -65,7 +42,7 @@ class PdfAuditor(BaseAuditor):
     ) -> ArtifactAuditReport:
         raw = read_file_bytes(path)
         try:
-            reader = PdfReader(io.BytesIO(raw))
+            reader = PdfReader(io.BytesIO(raw), strict=True)
         except PyPdfError as exc:
             return build_report(
                 self.format,
@@ -73,7 +50,7 @@ class PdfAuditor(BaseAuditor):
                     ArtifactFinding(
                         code=AuditCode.PDF_OPEN_FAILED,
                         severity=ArtifactFindingSeverity.ERROR,
-                        description="Artifact is not a readable PDF",
+                        description="Artifact is not a readable strict PDF",
                         evidence=f"error={type(exc).__name__}",
                     ),
                 ),
@@ -105,22 +82,19 @@ class PdfAuditor(BaseAuditor):
                     )
                 )
             findings.extend(
-                missing_section_findings(extracted, expected, ordered=False, collapse=True)
+                missing_section_findings(extracted, expected, ordered=True, collapse=True)
             )
-            findings.extend(missing_claim_findings(extracted, expected, collapse=True))
         if extraction_ok:
             findings.extend(prohibited_term_findings(extracted))
-        metadata = reader.metadata
-        if metadata:
-            findings.extend(prohibited_term_findings(str(dict(metadata))))
+        findings.extend(_metadata_findings(reader))
         javascript_present, active_content_present = _active_content_present_local(reader)
         if javascript_present:
             findings.append(
                 ArtifactFinding(
                     code=AuditCode.PDF_JAVASCRIPT,
                     severity=ArtifactFindingSeverity.ERROR,
-                    description="JavaScript placement detected in the PDF catalog",
-                    evidence="local_check",
+                    description="JavaScript placement detected in the PDF object graph",
+                    evidence="object_graph",
                 )
             )
         if active_content_present:
@@ -128,22 +102,65 @@ class PdfAuditor(BaseAuditor):
                 ArtifactFinding(
                     code=AuditCode.PDF_ACTIVE_CONTENT,
                     severity=ArtifactFindingSeverity.ERROR,
-                    description="Embedded or interactive content detected in the PDF",
-                    evidence="local_catalog_walk",
+                    description="Embedded, interactive, or annotated content detected",
+                    evidence="object_graph",
                 )
             )
         return build_report(self.format, tuple(findings))
 
 
 def _resolved(reader: PdfReader, obj: object) -> object:
-    """Resolve one level of indirection for catalog navigation."""
     if isinstance(obj, IndirectObject):
         return reader.get_object(obj)
     return obj
 
 
+def _metadata_findings(reader: PdfReader) -> tuple[ArtifactFinding, ...]:
+    findings: list[ArtifactFinding] = []
+    metadata_present = False
+    try:
+        metadata_present = bool(reader.metadata)
+    except PyPdfError:
+        metadata_present = True
+    if metadata_present:
+        findings.append(
+            ArtifactFinding(
+                code=AuditCode.METADATA_PROHIBITED,
+                severity=ArtifactFindingSeverity.ERROR,
+                description="PDF /Info metadata dictionary is present or unreadable",
+                evidence="trailer=/Info",
+            )
+        )
+
+    xmp_present = False
+    try:
+        xmp_present = reader.xmp_metadata is not None
+    except PyPdfError:
+        xmp_present = True
+    root = _resolved(reader, reader.trailer.get("/Root"))
+    if xmp_present or (isinstance(root, dict) and "/Metadata" in root):
+        findings.append(
+            ArtifactFinding(
+                code=AuditCode.METADATA_PROHIBITED,
+                severity=ArtifactFindingSeverity.ERROR,
+                description="PDF XMP metadata stream is present or unreadable",
+                evidence="catalog=/Metadata",
+            )
+        )
+    if reader.trailer.get("/ID") is not None:
+        findings.append(
+            ArtifactFinding(
+                code=AuditCode.METADATA_PROHIBITED,
+                severity=ArtifactFindingSeverity.ERROR,
+                description="PDF trailer document identifier is present",
+                evidence="trailer=/ID",
+            )
+        )
+    return tuple(findings)
+
+
 def _active_content_present_local(reader: PdfReader) -> tuple[bool, bool]:
-    """Walk the PDF object graph for scripts, attachments, and forms."""
+    """Walk the PDF object graph for scripts, attachments, forms, and annotations."""
     trailer = reader.trailer
     if trailer is None:
         return False, False
@@ -166,16 +183,26 @@ def _active_content_present_local(reader: PdfReader) -> tuple[bool, bool]:
                 keys = {str(key) for key in obj}
                 if "/JS" in keys or obj.get("/S") == NameObject("/JavaScript"):
                     javascript = True
-                if keys.intersection({"/EmbeddedFiles", "/AcroForm", "/RichMedia"}):
+                if keys.intersection(
+                    {
+                        "/EmbeddedFiles",
+                        "/AcroForm",
+                        "/RichMedia",
+                        "/Annots",
+                        "/AA",
+                    }
+                ):
                     active = True
                 stack.extend(obj.values())
             elif isinstance(obj, (list, tuple)):
                 stack.extend(obj)
     except PyPdfError:
         return True, True
+    if stack:
+        return True, True
     return javascript, active
 
 
 def _javascript_present_local(reader: PdfReader) -> bool:
-    """Compatibility wrapper for the independently implemented local walk."""
+    """Compatibility wrapper for existing tests."""
     return _active_content_present_local(reader)[0]

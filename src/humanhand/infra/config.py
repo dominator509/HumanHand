@@ -15,6 +15,7 @@ KNOWN_DETECTOR_PROVIDERS = {
     "winston",
     "turnitin",
 }
+KNOWN_KEY_PROVIDERS = {"auto", "dpapi", "test"}
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,8 @@ class Config:
     style_vault_dir: str = ".humanhand/style-vault"
     project_dir: str | None = None
     privacy_mode: str = "private_audited"
+    key_provider: str = "auto"
+    allow_test_key_provider: bool = False
 
 
 def _parse_positive_int(raw: str | None, default: int, env_name: str) -> int:
@@ -79,6 +82,15 @@ def _parse_privacy_mode(raw: str | None) -> str:
     return mode
 
 
+def _parse_key_provider(raw: str | None) -> str:
+    if raw is None:
+        return "auto"
+    provider = raw.strip().lower()
+    if provider not in KNOWN_KEY_PROVIDERS:
+        raise ValueError(f"Unknown key provider: {raw}")
+    return provider
+
+
 def _parse_detector_provider(raw: str | None) -> str:
     if raw is None:
         return "local"
@@ -98,7 +110,9 @@ def _parse_optional_string(raw: str | None) -> str | None:
 def load_config() -> Config:
     """Load and validate configuration from environment variables.
 
-    Returns a Config dataclass. Does not log secrets.
+    Returns a Config dataclass. Does not log secrets. The deterministic test
+    key provider is disabled by default and may only be enabled explicitly
+    for CI/development fixtures.
     """
     max_chars = _parse_positive_int(
         os.getenv("HUMANHAND_MAX_CHARS"),
@@ -119,6 +133,11 @@ def load_config() -> Config:
         os.getenv("HUMANHAND_ALLOW_INSECURE"),
         False,
         "HUMANHAND_ALLOW_INSECURE",
+    )
+    allow_test_key_provider = _parse_bool(
+        os.getenv("HUMANHAND_ALLOW_TEST_KEY_PROVIDER"),
+        False,
+        "HUMANHAND_ALLOW_TEST_KEY_PROVIDER",
     )
 
     seed_str = os.getenv("HUMANHAND_SEED")
@@ -167,4 +186,6 @@ def load_config() -> Config:
         style_vault_dir=os.getenv("HUMANHAND_STYLE_VAULT_DIR", ".humanhand/style-vault"),
         project_dir=_parse_optional_string(os.getenv("HUMANHAND_PROJECT_DIR")),
         privacy_mode=_parse_privacy_mode(os.getenv("HUMANHAND_PRIVACY_MODE")),
+        key_provider=_parse_key_provider(os.getenv("HUMANHAND_KEY_PROVIDER")),
+        allow_test_key_provider=allow_test_key_provider,
     )

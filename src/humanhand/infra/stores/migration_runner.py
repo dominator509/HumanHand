@@ -1,10 +1,10 @@
-"""Versioned SQLite migrations with a sidecar backup and rollback (EP-015).
+"""Versioned SQLite migrations with sidecar backup and rollback.
 
-The project database uses the default (non-WAL) journal mode, so a plain file
-copy taken before any write is a consistent snapshot. The backup lives next to
-the database (``project.db.bak``) and restores the pre-migration bytes
-atomically via :func:`rollback_from_backup`. No stale ``-wal`` file can ever
-replay writes on top of restored bytes.
+The legacy ``ProjectStore`` remains at compatibility schema version 2. The
+EP-019 ``IntegratedProjectStore`` explicitly requests the current version 3,
+which adds immutable accepted revision content. This preserves the established
+base-store contract while providing a clean upgrade seam for the production
+workflow.
 """
 
 from __future__ import annotations
@@ -17,7 +17,9 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 
-from humanhand.infra.stores.project_schema import MIGRATIONS
+from humanhand.infra.stores.project_schema import MIGRATIONS, PROJECT_SCHEMA_VERSION
+
+LEGACY_PROJECT_STORE_SCHEMA_VERSION = 2
 
 
 class MigrationError(Exception):
@@ -78,26 +80,32 @@ def _utc_iso_now() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def apply_migrations(connection: sqlite3.Connection, *, backup_path: str | Path) -> int:
-    """Apply pending migrations in order and return the final version.
+def apply_migrations(
+    connection: sqlite3.Connection,
+    *,
+    backup_path: str | Path,
+    target_version: int = LEGACY_PROJECT_STORE_SCHEMA_VERSION,
+) -> int:
+    """Apply migrations through ``target_version`` and return the final version.
 
-    Before the first pending migration the existing database file is copied to
-    ``backup_path`` (a plain file copy taken BEFORE any write; the store never
-    enables WAL journaling, so the main file is a consistent snapshot at that
-    point). Each migration runs inside its own explicit transaction: a failing
-    migration rolls back completely (SQLite DDL is transactional) and raises
-    :class:`MigrationError`, leaving the database at the last good version.
-    ``applied_at`` is a UTC wall-clock timestamp recorded for diagnostics only;
-    it is metadata, not canonical content.
+    The default is the established schema-v2 ``ProjectStore`` contract.
+    Integrated production callers request ``PROJECT_SCHEMA_VERSION``
+    explicitly. A target outside the known range fails closed. Opening a newer
+    database with an older target is read-compatible and returns the existing
+    version without attempting a downgrade.
     """
+    if not 1 <= target_version <= PROJECT_SCHEMA_VERSION:
+        raise MigrationError(
+            f"Unsupported migration target {target_version}; current is {PROJECT_SCHEMA_VERSION}"
+        )
     backup = Path(backup_path)
     current = current_version(connection)
-    pending = [migration for migration in MIGRATIONS if migration[0] > current]
+    if current >= target_version:
+        return current
+    pending = [migration for migration in MIGRATIONS if current < migration[0] <= target_version]
     if not pending:
         return current
-    # Snapshot the state immediately before this upgrade.  A sidecar left
-    # by an older migration is stale and must not be used as the rollback
-    # point for a newer schema transition.
+
     shutil.copyfile(_database_path(connection), backup)
     for version, sql in pending:
         try:
@@ -118,12 +126,7 @@ def apply_migrations(connection: sqlite3.Connection, *, backup_path: str | Path)
 
 
 def rollback_from_backup(database_path: str | Path, backup_path: str | Path) -> None:
-    """Restore ``database_path`` from ``backup_path`` using atomic ``os.replace``.
-
-    Refuses when the backup does not exist. The restored file is authoritative
-    because the store never enables WAL journaling, so no stale ``-wal`` file
-    can replay writes on top of the restored bytes.
-    """
+    """Restore ``database_path`` from ``backup_path`` using atomic ``os.replace``."""
     backup = Path(backup_path)
     if not backup.is_file():
         raise MigrationError(f"Backup does not exist: {backup}")

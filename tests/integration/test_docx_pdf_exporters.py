@@ -1,4 +1,4 @@
-"""Integration tests for the DOCX and PDF public-document exporters (EP-016)."""
+"""Integration tests for metadata-free DOCX and PDF public exporters."""
 
 from __future__ import annotations
 
@@ -22,44 +22,41 @@ def _request(document: PublicDocument, output: Path, fmt: ExportFormat) -> Expor
 
 @pytest.mark.importers
 class TestDocxExporter:
-    def test_package_contains_escaped_text(self, tmp_path: Path) -> None:
+    def test_package_contains_only_approved_content_parts(self, tmp_path: Path) -> None:
         document = build_public_document(
             title="Quarterly <Summary> & Notes",
             sections=("Revenue grew 10% & costs fell.",),
-            claims=(),
+            claims=("Internal validation claim.",),
         )
         output = tmp_path / "report.docx"
         DocxExporter().export(_request(document, output, ExportFormat.DOCX))
 
         with zipfile.ZipFile(output) as archive:
-            names = set(archive.namelist())
-            # Minimal OOXML package: content types, root rels, document, core props.
-            assert "[Content_Types].xml" in names
-            assert "_rels/.rels" in names
-            assert "word/document.xml" in names
-            assert "docProps/core.xml" in names
+            assert archive.namelist() == [
+                "[Content_Types].xml",
+                "_rels/.rels",
+                "word/document.xml",
+            ]
             document_xml = archive.read("word/document.xml").decode("utf-8")
-            # XML-escaped text: "<" and "&" become entities inside w:t runs.
             assert "Quarterly &lt;Summary&gt; &amp; Notes" in document_xml
             assert "Revenue grew 10% &amp; costs fell." in document_xml
-            core = archive.read("docProps/core.xml").decode("utf-8")
-            assert "<dc:title>Quarterly &lt;Summary&gt; &amp; Notes</dc:title>" in core
-            # Fresh package: no author or revision metadata.
-            assert "Creator" not in core
+            assert "Internal validation claim" not in document_xml
+            assert all(info.date_time == (1980, 1, 1, 0, 0, 0) for info in archive.infolist())
 
-    def test_claims_block_and_determinism(self, tmp_path: Path) -> None:
+    def test_content_only_output_is_byte_deterministic(self) -> None:
         document = build_public_document(
-            title="Memo", sections=("One.",), claims=("First claim.", "Second claim.")
+            title="Memo",
+            sections=("One.",),
+            claims=("First internal claim.", "Second internal claim."),
         )
         first = DocxExporter().export_bytes(document)
         second = DocxExporter().export_bytes(document)
-        # Byte-deterministic for identical documents.
         assert first == second
         with zipfile.ZipFile(io.BytesIO(first)) as archive:
-            document_xml = archive.read("word/document.xml").decode("utf-8")
-        assert "Claims:" in document_xml
-        assert "• First claim." in document_xml
-        assert "• Second claim." in document_xml
+            package = b"\n".join(archive.read(name) for name in archive.namelist())
+        assert b"Claims:" not in package
+        assert b"First internal claim" not in package
+        assert b"docProps" not in package
 
     def test_refuses_humanhand_output_path(self, tmp_path: Path) -> None:
         document = build_public_document(title="Memo", sections=("One.",), claims=())
@@ -71,21 +68,34 @@ class TestDocxExporter:
 
 @pytest.mark.importers
 class TestPdfExporter:
-    def test_pdf_readable_and_contains_title(self, tmp_path: Path) -> None:
+    def test_pdf_is_content_only_and_metadata_free(self, tmp_path: Path) -> None:
         document = build_public_document(
             title="Annual Review",
             sections=("Findings are summarized here.",),
-            claims=("Claim one.",),
+            claims=("Internal claim one.",),
         )
         output = tmp_path / "review.pdf"
         PdfExporter().export(_request(document, output, ExportFormat.PDF))
 
         raw = output.read_bytes()
-        assert raw.startswith(b"%PDF")  # real PDF magic bytes
-        reader = PdfReader(io.BytesIO(raw))
+        assert raw.startswith(b"%PDF")
+        reader = PdfReader(io.BytesIO(raw), strict=True)
         text = "\n".join(page.extract_text() or "" for page in reader.pages)
         assert "Annual Review" in text
-        assert "Claims" in text
+        assert "Findings are summarized here." in text
+        assert "Internal claim one" not in text
+        assert not reader.metadata
+        assert reader.xmp_metadata is None
+        assert reader.trailer.get("/ID") is None
+        assert "/Metadata" not in reader.root_object
+
+    def test_pdf_bytes_are_deterministic_for_equal_content(self) -> None:
+        document = build_public_document(
+            title="Review",
+            sections=("One.", "Two."),
+            claims=("Internal claim.",),
+        )
+        assert PdfExporter().export_bytes(document) == PdfExporter().export_bytes(document)
 
     def test_refuses_humanhand_output_path(self, tmp_path: Path) -> None:
         document = build_public_document(title="Review", sections=("One.",), claims=())

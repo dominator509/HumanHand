@@ -1,22 +1,9 @@
-"""DOCX artifact auditor (EP-016).
+"""Independent metadata-free DOCX artifact auditor (EP-019).
 
-Independent audit path: the auditor re-reads the artifact bytes from
-disk, opens the package with :mod:`zipfile`, parses the main document
-part through the repository's bounded/defused XML tooling
-(``container_utils``), and scans every package part. It shares no code
-with the exporter (the exporter's in-memory package is never reused).
-
-Checks:
-- the bytes are a valid ZIP package,
-- ``word/document.xml`` is present and well-formed (bounded parse),
-- every expected section text is present in the extracted document text
-  (XML entities unescaped first), order-insensitive,
-- no ``project_id`` or ``claim_id`` term in ANY package part,
-- no VBA macro parts (names containing ``vbaproject``/``vbadata``).
-
-Fail-closed extra: a package part that cannot be read is an ERROR
-(``audit.docx.part_unreadable``) because the no-prohibited-terms
-guarantee cannot be verified for that part.
+The auditor re-reads the artifact from disk, validates the ZIP/XML structure,
+extracts visible text independently, and fails closed on any properties,
+custom XML, revisions, comments, hidden text, external relationships, macros,
+embedded objects, headers/footers, or prohibited internal identifiers.
 """
 
 from __future__ import annotations
@@ -45,20 +32,40 @@ from .base import (
     AuditCode,
     BaseAuditor,
     build_report,
-    missing_claim_findings,
     missing_section_findings,
     read_file_bytes,
 )
 
 MAIN_DOCUMENT_PART = "word/document.xml"
-# Terms that must not appear anywhere inside a public DOCX package.
 DOCX_METADATA_TERMS = PROHIBITED_METADATA_TERMS
-# Part-name markers for VBA macro payloads.
-MACRO_PART_MARKERS = ("vbaproject", "vbadata")
+_MACRO_PART_MARKERS = ("vbaproject", "vbadata")
+_FORBIDDEN_PART_PREFIXES = (
+    "docprops/",
+    "customxml/",
+    "word/comments",
+    "word/people",
+    "word/embeddings/",
+    "word/header",
+    "word/footer",
+    "word/glossary/",
+)
+_FORBIDDEN_XML_MARKERS = (
+    b"<w:ins",
+    b"<w:del",
+    b"<w:movefrom",
+    b"<w:moveto",
+    b"<w:commentrange",
+    b"<w:commentreference",
+    b"<w:altchunk",
+    b"<w:object",
+    b"<w:control",
+    b"w:vanish",
+    b"w:webhidden",
+)
 
 
 class DocxAuditor(BaseAuditor):
-    """Independent auditor for DOCX artifacts (format ``docx``)."""
+    """Independent auditor for metadata-free DOCX artifacts."""
 
     format = "docx"
 
@@ -105,22 +112,31 @@ class DocxAuditor(BaseAuditor):
         names = archive.namelist()
         for name in names:
             if name.endswith("/"):
-                continue  # directory entry, not a package part
+                continue
             lowered = name.lower()
-            for marker in MACRO_PART_MARKERS:
-                if marker in lowered:
-                    findings.append(
-                        ArtifactFinding(
-                            code=AuditCode.DOCX_MACROS,
-                            severity=ArtifactFindingSeverity.ERROR,
-                            description="VBA macro part detected in the package",
-                            evidence=f"part={evidence_name(name)}",
-                        )
+            if any(lowered.startswith(prefix) for prefix in _FORBIDDEN_PART_PREFIXES):
+                findings.append(
+                    ArtifactFinding(
+                        code=AuditCode.DOCX_METADATA_PROHIBITED,
+                        severity=ArtifactFindingSeverity.ERROR,
+                        description="Prohibited DOCX package part detected",
+                        evidence=f"part={evidence_name(name)}",
                     )
+                )
+            if any(marker in lowered for marker in _MACRO_PART_MARKERS):
+                findings.append(
+                    ArtifactFinding(
+                        code=AuditCode.DOCX_MACROS,
+                        severity=ArtifactFindingSeverity.ERROR,
+                        description="VBA macro part detected in the package",
+                        evidence=f"part={evidence_name(name)}",
+                    )
+                )
+
         document_text: str | None = None
         if MAIN_DOCUMENT_PART in names:
             document_text = self._read_main_document(archive, policy, findings)
-        elif expected is not None:
+        else:
             findings.append(
                 ArtifactFinding(
                     code=AuditCode.DOCX_DOCUMENT_XML_MALFORMED,
@@ -129,7 +145,7 @@ class DocxAuditor(BaseAuditor):
                     evidence=f"part={MAIN_DOCUMENT_PART}",
                 )
             )
-        self._scan_parts_for_metadata(archive, policy, names, findings)
+        self._scan_parts(archive, policy, names, findings)
         if expected is not None and document_text is not None:
             if expected.title and expected.title not in document_text:
                 findings.append(
@@ -140,8 +156,7 @@ class DocxAuditor(BaseAuditor):
                         evidence="part=word/document.xml",
                     )
                 )
-            findings.extend(missing_section_findings(document_text, expected, ordered=False))
-            findings.extend(missing_claim_findings(document_text, expected))
+            findings.extend(missing_section_findings(document_text, expected, ordered=True))
 
     def _read_main_document(
         self,
@@ -176,7 +191,7 @@ class DocxAuditor(BaseAuditor):
             return None
         return _document_text(root)
 
-    def _scan_parts_for_metadata(
+    def _scan_parts(
         self,
         archive: zipfile.ZipFile,
         policy: ImportPolicy,
@@ -192,7 +207,7 @@ class DocxAuditor(BaseAuditor):
                     ArtifactFinding(
                         code=AuditCode.DOCX_PART_UNREADABLE,
                         severity=ArtifactFindingSeverity.ERROR,
-                        description="Package part could not be read; prohibited-term scan skipped",
+                        description="Package part could not be read; audit incomplete",
                         evidence=f"part={evidence_name(name)}, reason={read_findings[0].code}",
                     )
                 )
@@ -209,55 +224,42 @@ class DocxAuditor(BaseAuditor):
                         evidence=f"part={evidence_name(name)}",
                     )
                 )
-            if b"w:vanish" in lowered:
-                findings.append(
-                    ArtifactFinding(
-                        code=AuditCode.DOCX_HIDDEN_CONTENT,
-                        severity=ArtifactFindingSeverity.ERROR,
-                        description="Hidden text formatting detected in a package part",
-                        evidence=f"part={evidence_name(name)}",
+            for marker in _FORBIDDEN_XML_MARKERS:
+                if marker in lowered:
+                    findings.append(
+                        ArtifactFinding(
+                            code=AuditCode.DOCX_HIDDEN_CONTENT,
+                            severity=ArtifactFindingSeverity.ERROR,
+                            description="Hidden, revision, or embedded content detected",
+                            evidence=f"part={evidence_name(name)}, marker={marker.decode()}",
+                        )
                     )
-                )
             for term in DOCX_METADATA_TERMS:
                 if term.encode("utf-8") in lowered:
                     findings.append(
                         ArtifactFinding(
                             code=AuditCode.DOCX_METADATA_PROHIBITED,
                             severity=ArtifactFindingSeverity.ERROR,
-                            description=(
-                                "Prohibited internal metadata term present in a "
-                                f"package part: {term}"
-                            ),
+                            description=f"Prohibited internal metadata term present: {term}",
                             evidence=f"part={evidence_name(name)}, term={term}",
                         )
                     )
 
 
 def _local_name(tag: object) -> str:
-    """Return the local name of an XML tag, stripping any namespace."""
-    text = str(tag)
-    return text.rsplit("}", 1)[-1]
+    return str(tag).rsplit("}", 1)[-1]
 
 
 def _document_text(root: Any) -> str:
-    """Extract paragraph text from a parsed main-document element tree.
-
-    ``w:t`` runs are unescaped with :func:`html.unescape` because the
-    exporter stores document text as XML-escaped runs; containment must
-    compare the actual text. Paragraphs are joined with ``\\n``.
-    """
+    """Extract paragraph text from the independently parsed document tree."""
     paragraphs: list[str] = []
-    current: list[str] = []
-    in_paragraph = False
-    for element in root.iter():
-        local = _local_name(element.tag)
-        if local == "p":
-            if in_paragraph and current:
-                paragraphs.append("".join(current))
-                current = []
-            in_paragraph = True
-        elif in_paragraph and local == "t" and element.text:
-            current.append(html.unescape(str(element.text)))
-    if current:
-        paragraphs.append("".join(current))
+    for paragraph in root.iter():
+        if _local_name(paragraph.tag) != "p":
+            continue
+        text = "".join(
+            html.unescape(str(element.text))
+            for element in paragraph.iter()
+            if _local_name(element.tag) == "t" and element.text
+        )
+        paragraphs.append(text)
     return "\n".join(paragraphs)

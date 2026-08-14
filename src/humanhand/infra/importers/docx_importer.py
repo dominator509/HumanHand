@@ -15,6 +15,11 @@ Honest scope of this adapter:
   ``w:tc`` -> TABLE_CELL) with each cell's run text concatenated. Table
   nodes carry a whole-document-body source span: the paragraph/table
   interleaving order inside ``document.xml`` is not reconstructed.
+- Rich run formatting, paragraph spacing/indentation, font semantics,
+  numbering/style inheritance, and section/page layout are inventoried only
+  through the immutable original; they are not represented in the current
+  canonical AST. Style-lane coverage therefore reports these capability gaps
+  instead of claiming full fidelity.
 - ``inspect()`` is inherited from ``ContainerImporter``; with DOCX
   registered in ``file_type`` the identity gate routes DOCX normally and
   all identity checks (magic mismatch, binary content) fail closed.
@@ -36,10 +41,7 @@ from humanhand.domain.import_findings import (
 )
 from humanhand.domain.import_policy import ImportPolicy
 from humanhand.domain.metadata_inventory import MetadataInventory
-from humanhand.infra.importers.base import (
-    ContainerImporter,
-    assemble_rich_payloads,
-)
+from humanhand.infra.importers.base import ContainerImporter, assemble_rich_payloads
 from humanhand.infra.importers.container_utils import evidence_name, open_zip_bounded
 from humanhand.infra.importers.docx_parts import (
     COMMENTS_PART,
@@ -54,25 +56,27 @@ from humanhand.infra.importers.docx_parts import (
     macro_part_name,
 )
 
-# Mirrors active_content._SCHEME_HOST_RE: evidence carries at most the
-# URL scheme and host, never credentials or document text.
 _SCHEME_HOST_RE = re.compile(r"[a-z][a-z0-9+.-]*://[^/\s\"'<>()?#]{0,64}", re.IGNORECASE)
+_DOCX_STYLE_GAPS = (
+    "heading_semantics",
+    "paragraph_table_interleaving",
+    "run_formatting",
+    "paragraph_formatting",
+    "numbering_and_style_inheritance",
+    "font_and_spacing_semantics",
+    "section_and_page_layout",
+)
 
 
 class DocxImporter(ContainerImporter):
     """Inspect DOCX packages into the shared payload envelope."""
 
     parser_name = "docx"
-    parser_version = "1"
+    parser_version = "2"
     supported_kinds = frozenset({FileKind.DOCX})
 
     def parse_payloads(self, raw: bytes, policy: ImportPolicy) -> dict[str, object]:
-        """Parse DOCX bytes into the shared worker payload envelope.
-
-        The container is opened through the bounded ZIP helper; every part
-        read and XML parse inside it is bounded by the policy. The raw
-        bytes are never written and never leave the caller's memory.
-        """
+        """Parse DOCX bytes into the shared worker payload envelope."""
         findings: list[ImportFinding] = []
         archive, open_findings = open_zip_bounded(raw, policy)
         if archive is None:
@@ -178,8 +182,8 @@ class DocxImporter(ContainerImporter):
                 coverage = CoverageSummary(
                     adapter=self.parser_name,
                     supported_structures=supported,
-                    unsupported_structures=(),
-                    status="complete",
+                    unsupported_structures=(_DOCX_STYLE_GAPS if policy.lane == "style" else ()),
+                    status=("partial" if policy.lane == "style" else "complete"),
                 )
 
             metadata = MetadataInventory(items=tuple(metadata_items))
@@ -204,11 +208,7 @@ class DocxImporter(ContainerImporter):
         tables: list[list[list[DocxTableCell]]],
         body_findings: list[ImportFinding],
     ) -> NodeBuilder | None:
-        """Build the document tree, or None when the body is unreadable.
-
-        Paragraph nodes carry exact spans into the body surface text;
-        table nodes derive their spans from their exact cell spans.
-        """
+        """Build the document tree, or None when the body is unreadable."""
         if any(finding.severity is FindingSeverity.ERROR for finding in body_findings):
             return None
         root = NodeBuilder(node_type=NodeType.DOCUMENT)
@@ -220,7 +220,8 @@ class DocxImporter(ContainerImporter):
                         node_type=NodeType.PARAGRAPH,
                         text=line,
                         source_location=SourceLocation(
-                            start_offset=cursor, end_offset=cursor + len(line)
+                            start_offset=cursor,
+                            end_offset=cursor + len(line),
                         ),
                     )
                 )

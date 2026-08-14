@@ -1,12 +1,10 @@
-"""Minimal but REAL OOXML DOCX package builder (deterministic).
+"""Minimal metadata-free deterministic OOXML DOCX package builder.
 
-Mirrors the structural pattern of ``tests/integration/support/docx_builder.py``:
-a ZIP of ``[Content_Types].xml``, ``_rels/.rels``, ``word/document.xml`` with
-``w:p/w:r/w:t`` runs (text XML-escaped), and ``docProps/core.xml`` carrying
-only ``dc:title``. A fresh package means no comments, tracked changes, macros,
-embeddings, external relationships, headers/footers, or author/revision
-metadata (blueprint section 11.4 audit list). Byte-deterministic: fixed member
-order, fixed compression, and zipfile's fixed default member timestamps.
+The package contains only the content-types declaration, root office-document
+relationship, and ``word/document.xml``. It deliberately omits ``docProps``,
+custom XML, comments, revisions, macros, external relationships, headers,
+footers, thumbnails, and embedded objects. Equal paragraph inputs produce
+byte-identical ZIP bytes with fixed member order and timestamps.
 """
 
 from __future__ import annotations
@@ -18,8 +16,7 @@ from html import escape
 _W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _PKG_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 _CT_NS = "http://schemas.openxmlformats.org/package/2006/content-types"
-_CORE_NS = "http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
-_DC_NS = "http://purl.org/dc/elements/1.1/"
+_FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 
 
 def _content_types_xml() -> str:
@@ -31,8 +28,6 @@ def _content_types_xml() -> str:
         '<Default Extension="xml" ContentType="application/xml"/>'
         '<Override PartName="/word/document.xml" ContentType="'
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
-        '<Override PartName="/docProps/core.xml" ContentType="'
-        'application/vnd.openxmlformats-package.core-properties+xml"/>'
         "</Types>"
     )
 
@@ -49,33 +44,29 @@ def _root_rels_xml() -> str:
 
 
 def _document_xml(paragraphs: list[str]) -> str:
-    body_parts = [f"<w:p><w:r><w:t>{escape(p)}</w:t></w:r></w:p>" for p in paragraphs]
+    body_parts = [
+        f'<w:p><w:r><w:t xml:space="preserve">{escape(paragraph)}</w:t></w:r></w:p>'
+        for paragraph in paragraphs
+    ]
+    body_parts.append("<w:sectPr/>")
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         f'<w:document xmlns:w="{_W_NS}"><w:body>' + "".join(body_parts) + "</w:body></w:document>"
     )
 
 
-def _core_properties_xml(title: str) -> str:
-    return (
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        f'<cp:coreProperties xmlns:cp="{_CORE_NS}" xmlns:dc="{_DC_NS}">'
-        f"<dc:title>{escape(title)}</dc:title>"
-        "</cp:coreProperties>"
-    )
+def _write_member(archive: zipfile.ZipFile, name: str, text: str) -> None:
+    info = zipfile.ZipInfo(filename=name, date_time=_FIXED_ZIP_TIME)
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.external_attr = 0o600 << 16
+    archive.writestr(info, text.encode("utf-8"))
 
 
-def build_docx_package(title: str, paragraphs: list[str]) -> bytes:
-    """Build a minimal valid DOCX package in memory and return its bytes.
-
-    ``title`` becomes ``dc:title`` in ``docProps/core.xml``; ``paragraphs``
-    become ``<w:p><w:r><w:t>`` runs in the document body with text escaped.
-    The package is deterministic for identical inputs.
-    """
+def build_docx_package(paragraphs: list[str]) -> bytes:
+    """Build a fresh deterministic DOCX package from approved paragraphs."""
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("[Content_Types].xml", _content_types_xml())
-        archive.writestr("_rels/.rels", _root_rels_xml())
-        archive.writestr("word/document.xml", _document_xml(paragraphs))
-        archive.writestr("docProps/core.xml", _core_properties_xml(title))
+        _write_member(archive, "[Content_Types].xml", _content_types_xml())
+        _write_member(archive, "_rels/.rels", _root_rels_xml())
+        _write_member(archive, "word/document.xml", _document_xml(paragraphs))
     return buffer.getvalue()

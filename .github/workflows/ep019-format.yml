@@ -1,0 +1,39 @@
+name: EP-019 formatter
+
+on:
+  push:
+    branches:
+      - agent/ep019-production-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ep019-production-hardening
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: latest
+          enable-cache: false
+      - run: sh scripts/install.sh
+      - run: sh scripts/uv.sh run ruff format .
+      - name: Commit canonical formatting
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "Apply canonical Ruff formatting"
+          git push origin HEAD:agent/ep019-production-hardening
