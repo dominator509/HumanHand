@@ -50,8 +50,8 @@ def build_privacy_runtime(config: Config, *, logger: Logger | None = None) -> Pr
     unless the operator explicitly enables that provider for CI/development.
     """
     policy = load_privacy_policy(config.privacy_mode)
-    resolved_logger: Logger = NullLogger() if policy.mode.value == "strict_local" else (
-        logger or NullLogger()
+    resolved_logger: Logger = (
+        NullLogger() if policy.mode.value == "strict_local" else (logger or NullLogger())
     )
     provider: KeyProvider | None = None
     if policy.encrypt_sensitive_fields:
