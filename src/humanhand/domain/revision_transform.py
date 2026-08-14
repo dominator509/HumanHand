@@ -89,8 +89,7 @@ def _apply_node_changes(
 
     if node_changes and node.text and node.node_type in _PROTECTED_TEXT_NODE_TYPES:
         raise DomainError(
-            f"Lexical change touches protected canonical node "
-            f"{node.node_id}:{node.node_type.value}"
+            f"Lexical change touches protected canonical node {node.node_id}:{node.node_type.value}"
         )
     if node_changes and node.text and node.node_type not in _EDITABLE_NODE_TYPES:
         raise DomainError(
@@ -113,9 +112,7 @@ def _apply_node_changes(
             if working[local_offset : local_offset + change.length] != change.source_surface:
                 raise DomainError(f"Change {change.change_id} does not match canonical node text")
             working = (
-                working[:local_offset]
-                + change.target
-                + working[local_offset + change.length :]
+                working[:local_offset] + change.target + working[local_offset + change.length :]
             )
         new_text = working
         covered = tuple(change.change_id for change in node_changes)
