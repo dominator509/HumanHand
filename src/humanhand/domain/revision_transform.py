@@ -1,10 +1,10 @@
 """Deterministically apply reviewed lexical changes to a canonical document.
 
 The transform is intentionally narrow: accepted lexical changes may touch only
-exactly represented paragraph, list-item, or table-cell text. Headings,
-quotations, citations, code, and ambiguous/overlapping spans fail closed. Node
-ids and macro structure remain unchanged; source offsets are shifted by the
-length deltas and every changed node is rebuilt from its exact original span.
+exactly represented editable text nodes. Headings, quotations, citations,
+code, and ambiguous/overlapping spans fail closed. Empty structural parent
+nodes may overlap a change and receive shifted offsets, but never synthesize
+text. Node ids and macro structure remain unchanged.
 """
 
 from __future__ import annotations
@@ -20,8 +20,21 @@ from humanhand.domain.types import DomainError
 _EDITABLE_NODE_TYPES = frozenset(
     {
         NodeType.PARAGRAPH,
+        NodeType.SENTENCE,
+        NodeType.TEXT_RUN,
         NodeType.LIST_ITEM,
         NodeType.TABLE_CELL,
+    }
+)
+_PROTECTED_TEXT_NODE_TYPES = frozenset(
+    {
+        NodeType.HEADING,
+        NodeType.QUOTATION,
+        NodeType.CITATION,
+        NodeType.FOOTNOTE,
+        NodeType.ENDNOTE,
+        NodeType.CODE_BLOCK,
+        NodeType.HYPERLINK,
     }
 )
 
@@ -41,6 +54,7 @@ def _ordered_changes(proposal: LexicalProposal) -> tuple[LexicalChange, ...]:
 
 
 def _shifted_offset(offset: int, changes: tuple[LexicalChange, ...]) -> int:
+    """Translate one original offset after all changes ending at/before it."""
     shift = 0
     for change in changes:
         if change.offset + change.length <= offset:
@@ -67,18 +81,26 @@ def _apply_node_changes(
     node: DocumentNode,
     document: CanonicalDocument,
     changes: tuple[LexicalChange, ...],
-) -> DocumentNode:
+) -> tuple[DocumentNode, tuple[str, ...]]:
     location = node.source_location
     start = location.start_offset
     end = location.end_offset
     node_changes = _changes_inside(start, end, changes)
-    if node_changes and node.node_type not in _EDITABLE_NODE_TYPES:
+
+    if node_changes and node.text and node.node_type in _PROTECTED_TEXT_NODE_TYPES:
         raise DomainError(
-            f"Lexical change touches non-editable canonical node {node.node_id}:{node.node_type.value}"
+            f"Lexical change touches protected canonical node "
+            f"{node.node_id}:{node.node_type.value}"
+        )
+    if node_changes and node.text and node.node_type not in _EDITABLE_NODE_TYPES:
+        raise DomainError(
+            f"Lexical change touches unsupported canonical node "
+            f"{node.node_id}:{node.node_type.value}"
         )
 
     new_text = node.text
-    if node_changes:
+    covered: tuple[str, ...] = ()
+    if node_changes and node.text:
         if start < 0 or end > len(document.surface_text) or end < start:
             raise DomainError(f"Canonical node {node.node_id} has invalid source offsets")
         if document.surface_text[start:end] != node.text:
@@ -96,20 +118,24 @@ def _apply_node_changes(
                 + working[local_offset + change.length :]
             )
         new_text = working
+        covered = tuple(change.change_id for change in node_changes)
 
+    # _shifted_offset(end) already includes every delta for changes contained
+    # in this node, so no second node-local delta is applied here.
     new_start = _shifted_offset(start, changes)
     new_end = _shifted_offset(end, changes)
-    for change in node_changes:
-        new_end += len(change.target) - change.length
-    return replace(
-        node,
-        text=new_text,
-        source_location=SourceLocation(
-            start_offset=new_start,
-            end_offset=new_end,
-            line_start=location.line_start,
-            line_end=location.line_end,
+    return (
+        replace(
+            node,
+            text=new_text,
+            source_location=SourceLocation(
+                start_offset=new_start,
+                end_offset=new_end,
+                line_start=location.line_start,
+                line_end=location.line_end,
+            ),
         ),
+        covered,
     )
 
 
@@ -118,25 +144,20 @@ def apply_reviewed_proposal(
 ) -> CanonicalDocument:
     """Return a new canonical document with every reviewed change applied.
 
-    ``proposal`` is expected to contain only explicitly accepted changes
-    (normally the result of ``lexical_review.apply_review``). The proposal's
-    document hash is verified by :func:`apply_changes`; every change must map
-    to exactly one editable exact-span node. Structure and node ids are
-    preserved while offsets and affected node texts are updated.
+    ``proposal`` must contain only explicitly accepted changes (normally the
+    result of :func:`humanhand.domain.lexical_review.apply_review`). The
+    proposal hash is verified by :func:`apply_changes`; every change must map
+    to at least one exactly represented editable text node. Structure and node
+    ids remain stable while source offsets and affected node texts are updated.
     """
     changes = _ordered_changes(proposal)
     new_surface = apply_changes(document.surface_text, proposal)
     covered_change_ids: set[str] = set()
     new_nodes: list[DocumentNode] = []
     for node in document.nodes:
-        inside = _changes_inside(
-            node.source_location.start_offset,
-            node.source_location.end_offset,
-            changes,
-        )
-        if node.node_type in _EDITABLE_NODE_TYPES:
-            covered_change_ids.update(change.change_id for change in inside)
-        new_nodes.append(_apply_node_changes(node, document, changes))
+        transformed, covered = _apply_node_changes(node, document, changes)
+        covered_change_ids.update(covered)
+        new_nodes.append(transformed)
     expected_ids = {change.change_id for change in changes}
     if covered_change_ids != expected_ids:
         missing = sorted(expected_ids - covered_change_ids)
