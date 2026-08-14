@@ -187,9 +187,7 @@ class IntegratedProjectStore(ProjectStore):
         _ = content.canonical_document
         return content
 
-    def save_protected_spans(
-        self, document_id: str, spans: tuple[ProtectedSpan, ...]
-    ) -> None:
+    def save_protected_spans(self, document_id: str, spans: tuple[ProtectedSpan, ...]) -> None:
         """Replace protected spans while encoding their exact source text."""
         with self._write() as connection:
             connection.execute("DELETE FROM protected_spans WHERE document_id = ?", (document_id,))
