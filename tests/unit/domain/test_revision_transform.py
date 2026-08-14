@@ -9,11 +9,11 @@ from humanhand.domain.document_nodes import NodeBuilder, NodeType, SourceLocatio
 from humanhand.domain.import_policy import ImportPolicy
 from humanhand.domain.lexical_context import build_contexts
 from humanhand.domain.lexical_normalizer import LexicalProposal, propose_changes
-from humanhand.domain.lexical_types import load_bundled_rules
 from humanhand.domain.protected_spans import ProtectedSpanSet
 from humanhand.domain.revision_transform import apply_reviewed_proposal
 from humanhand.domain.structure_signature import compute_structure_signature
 from humanhand.domain.types import DomainError
+from humanhand.infra.lexicons.lexicon_loader import load_bundled_rules
 
 
 def _document(text: str, node_type: NodeType = NodeType.PARAGRAPH) -> CanonicalDocument:
