@@ -1,76 +1,62 @@
 ---
 id: PRE-SLM-HARDENING-PROGRAM
 title: HumanHand Pre-SLM Hardening Program
-status: active
-current_execplan: EP-019
-last_completed_execplan: EP-018
+status: complete
+current_execplan: null
+last_completed_execplan: EP-019
+completed: 2026-08-13
 ---
 
 # HumanHand Pre-SLM Hardening Program
 
 ## Purpose
 
-Build the deterministic, privacy-preserving document, style, fact, project, export,
-review, and research-governance boundaries that must exist before HumanHand trains,
-downloads, connects, or runs a specialized local writing SLM.
+Build the deterministic, privacy-preserving document, style, fact, project, export, review, and
+research-governance boundaries required before HumanHand connects a specialized local writing SLM.
 
-The program preserves the existing five-command workflow while adding inspectable
-clean-room lanes and a public-artifact boundary. It does not promise perfect imitation;
-it preserves available evidence and reports unsupported or unresolved cases honestly.
+## Outcome
 
-## Authority and Handoff
+EP-011 through EP-019 are complete. HumanHand now has the clean-room source/style lanes, Style
+Fidelity evidence, Project Brain, deterministic context, revision handling, privacy runtime,
+lexical review, public-artifact boundary, independent auditors, and Research Beacon governance
+needed to constrain a future model.
 
-- The supplied `HumanHand_PreSLM_Implementation_Blueprint.md` is the design reference.
-- `CODEX_BOOTSTRAP_PROMPT_HUMANHAND_PRE_SLM.md` defines the resumable execution sequence.
-- Repository rules and the active ExecPlan remain authoritative when details conflict.
-- Claude Code is the bulk implementer for one plan; Codex audits and fixes at each boundary.
-- EP-011 through EP-018 are complete and audited. EP-019 is the next
-  implementation seam; this status update does not start EP-019.
-
-## Sequence
+## Completed Sequence
 
 | Plan | Result | Status |
 |---|---|---|
 | EP-011 | Program contract, ADRs, specs, and architecture migration | complete |
-| EP-012 | Canonical document model and parser sandbox | complete |
+| EP-012 | Canonical document model and parser worker | complete |
 | EP-013 | Dual clean-room source/style ingress | complete |
 | EP-014 | Style Fidelity Vault | complete |
 | EP-015 | Fact Integrity V2, Project Brain, and Context Broker | complete |
 | EP-016 | Privacy modes, public artifacts, exporters, and auditors | complete |
 | EP-017 | Deterministic lexical finalization and human review | complete |
 | EP-018 | Research Beacon and scanner observatory | complete |
-| EP-019 | Pre-SLM integration, migration, and readiness | planned |
+| EP-019 | Integration, migration, hardening, and readiness | complete |
 
-## Non-goals
+## Handoff
 
-- SLM selection, training, fine-tuning, model download, or inference runtime.
-- `llama.cpp`, Ollama, Transformers, TRL, LoRA, QLoRA, GGUF, or model weights.
-- Detector-score optimization, watermark-key recovery, or provenance destruction.
-- Automatic merge, publish, deploy, or external submission.
-- Hidden global document history or automatic Obsidian synchronization.
+The next authorized program is:
 
-## Program Invariants
+```text
+.agent/programs/LOCAL-WRITER-HYBRID-TRAINING-PROGRAM.md
+```
 
-1. Immutable original bytes, canonical evidence, internal working state, and public
-   artifacts are separate channels.
-2. Source and human-style imports use separate types, services, stores, and CLI lanes.
-3. Unknown, unsupported, ambiguous, or unresolved content fails closed with a finding
-   and `human_review_required` status.
-4. Canonical serialization, structural signatures, migrations, policies, and reports
-   are deterministic and versioned.
-5. Strict-local mode has no network, raw text logging, detector cache, or automatic
-   Obsidian projection.
-6. Public exporters receive only approved public-document data and are audited by an
-   independent path.
-7. Beacon research treats external content as untrusted data and requires human
-   approval before any quarantined remediation can be adopted.
-8. Existing `health`, `rewrite`, `verify`, `diff-facts`, and `scrub` behavior remains
-   available and documented throughout the migration.
+It begins at EP-020. The local writer remains a proposal source and cannot bypass any Pre-SLM
+boundary.
 
-## Definition of Done
+## Preserved Invariants
 
-EP-019 may close only when EP-011 through EP-019 are complete and audited, all new
-validation scripts pass, backward compatibility is proven, public artifacts are
-independently audited, and the repository still contains no SLM implementation.
-Remaining risks, unsupported formats, live-network gates, and maintainer-owned
-decisions must remain explicit.
+1. Immutable original, canonical evidence, working revision, and public artifact remain separate.
+2. Source and style lanes remain separate.
+3. Unknown/unsupported/ambiguous content fails closed.
+4. Strict-local remains network-free.
+5. Public exporters receive approved public content only.
+6. Deterministic/manual HumanHand remains usable without any model.
+7. Existing compatibility commands remain available until an explicit major-version decision.
+
+## Historical Non-goals
+
+The Pre-SLM program did not implement a model, training stack, GGUF runtime, or semantic repair. The
+completed status does not imply model readiness; that is governed by EP-020 through EP-028.
