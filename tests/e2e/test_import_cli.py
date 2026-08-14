@@ -7,10 +7,10 @@ worker subprocess is exercised; no network and no live services.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
-from click import unstyle
 from typer.testing import CliRunner, Result
 
 from humanhand.cli.app import app
@@ -18,6 +18,12 @@ from humanhand.cli.app import app
 runner = CliRunner()
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "import"
+_ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+
+def _unstyle(text: str) -> str:
+    """Remove ANSI control sequences from Rich/Typer help output."""
+    return _ANSI_ESCAPE.sub("", text)
 
 
 def _invoke(path: Path, *args: str) -> Result:
@@ -147,12 +153,12 @@ class TestImportInspectHelp:
     def test_import_help(self) -> None:
         result = runner.invoke(app, ["import", "--help"])
         assert result.exit_code == 0
-        assert "inspect" in unstyle(result.stdout)
+        assert "inspect" in _unstyle(result.stdout)
 
     def test_inspect_help(self) -> None:
         result = runner.invoke(app, ["import", "inspect", "--help"])
         assert result.exit_code == 0
-        help_text = unstyle(result.stdout)
+        help_text = _unstyle(result.stdout)
         assert "--json" in help_text
         assert "--lane" in help_text
         assert "--content" in help_text
