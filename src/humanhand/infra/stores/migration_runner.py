@@ -102,11 +102,7 @@ def apply_migrations(
     current = current_version(connection)
     if current >= target_version:
         return current
-    pending = [
-        migration
-        for migration in MIGRATIONS
-        if current < migration[0] <= target_version
-    ]
+    pending = [migration for migration in MIGRATIONS if current < migration[0] <= target_version]
     if not pending:
         return current
 
