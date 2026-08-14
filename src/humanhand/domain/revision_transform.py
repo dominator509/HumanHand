@@ -117,8 +117,6 @@ def _apply_node_changes(
         new_text = working
         covered = tuple(change.change_id for change in node_changes)
 
-    # _shifted_offset(end) already includes every delta for changes contained
-    # in this node, so no second node-local delta is applied here.
     new_start = _shifted_offset(start, changes)
     new_end = _shifted_offset(end, changes)
     return (
@@ -141,40 +139,40 @@ def apply_reviewed_proposal(
 ) -> CanonicalDocument:
     """Return a new canonical document with every reviewed change applied.
 
-    ``proposal`` must contain only explicitly accepted changes (normally the
-    result of :func:`humanhand.domain.lexical_review.apply_review`). The
-    proposal hash is verified by :func:`apply_changes`; every change must map
-    to at least one exactly represented editable text node. Structure and node
-    ids remain stable while source offsets and affected node texts are updated.
+    ``proposal`` must contain only explicitly accepted changes. The proposal
+    hash is verified by :func:`apply_changes`; every change must map to at
+    least one exactly represented editable text node. Structure and node ids
+    remain stable while source offsets and affected node texts are updated.
     """
     changes = _ordered_changes(proposal)
     new_surface = apply_changes(document.surface_text, proposal)
     covered_change_ids: set[str] = set()
     new_nodes: list[DocumentNode] = []
     for node in document.nodes:
-        transformed, covered = _apply_node_changes(node, document, changes)
+        transformed_node, covered = _apply_node_changes(node, document, changes)
         covered_change_ids.update(covered)
-        new_nodes.append(transformed)
+        new_nodes.append(transformed_node)
     expected_ids = {change.change_id for change in changes}
     if covered_change_ids != expected_ids:
         missing = sorted(expected_ids - covered_change_ids)
         raise DomainError(
             "Lexical changes are not covered by exact editable nodes: " + ",".join(missing)
         )
-    transformed = replace(
+    transformed_document = replace(
         document,
         surface_text=new_surface,
         canonical_text=unicodedata.normalize("NFC", new_surface),
         nodes=tuple(new_nodes),
     )
-    for node in transformed.nodes:
+    for node in transformed_document.nodes:
         location = node.source_location
         if (
             node.node_type in _EDITABLE_NODE_TYPES
             and node.text
-            and transformed.surface_text[location.start_offset : location.end_offset] != node.text
+            and transformed_document.surface_text[location.start_offset : location.end_offset]
+            != node.text
         ):
             raise DomainError(
                 f"Transformed canonical node {node.node_id} failed surface-span validation"
             )
-    return transformed
+    return transformed_document
