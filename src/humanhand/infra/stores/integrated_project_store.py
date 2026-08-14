@@ -17,12 +17,19 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 from humanhand.domain.canonical_document import CanonicalDocument
 from humanhand.domain.document_serialization import document_from_json
 from humanhand.domain.protected_spans import ProtectedSpan
 from humanhand.domain.revisions import DocumentRevision, RevisionStatus
+from humanhand.infra.stores.migration_runner import apply_migrations
+from humanhand.infra.stores.project_schema import PROJECT_SCHEMA_VERSION
 from humanhand.infra.stores.project_store import ProjectStore, ProjectStoreError
+
+if TYPE_CHECKING:
+    from humanhand.infra.stores.key_provider import KeyProvider
 
 
 @dataclass(frozen=True)
@@ -49,6 +56,36 @@ class StoredRevisionContent:
 
 class IntegratedProjectStore(ProjectStore):
     """ProjectStore plus accepted content and style-profile integration."""
+
+    def __init__(
+        self,
+        root: str | Path,
+        *,
+        encryption_enabled: bool = False,
+        key_provider: KeyProvider | None = None,
+    ) -> None:
+        """Open the compatibility store, then migrate through the integrated schema.
+
+        ``ProjectStore`` intentionally stops at the legacy-compatible schema-v2
+        boundary.  The integrated workflow requires schema v3, which adds the
+        immutable ``revision_contents`` table.  Applying the extra migration
+        here keeps both contracts explicit and prevents base-store tests or
+        consumers from being silently upgraded.
+        """
+        super().__init__(
+            root,
+            encryption_enabled=encryption_enabled,
+            key_provider=key_provider,
+        )
+        try:
+            apply_migrations(
+                self._connection,
+                backup_path=self._backup_path,
+                target_version=PROJECT_SCHEMA_VERSION,
+            )
+        except Exception:
+            self.close()
+            raise
 
     def latest_accepted_revision(self, document_id: str) -> DocumentRevision | None:
         """Return the highest-token ACCEPTED revision for ``document_id``."""
