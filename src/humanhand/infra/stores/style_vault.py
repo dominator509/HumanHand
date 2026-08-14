@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import contextlib
 import hashlib
 import json
 import os
@@ -90,7 +91,7 @@ class StyleVault:
     def _ensure_layout(self) -> None:
         self._originals.mkdir(parents=True, exist_ok=True)
         self._packages.mkdir(parents=True, exist_ok=True)
-        with __import__("contextlib").suppress(OSError):
+        with contextlib.suppress(OSError):
             os.chmod(self._root, 0o700)
             os.chmod(self._originals, 0o700)
             os.chmod(self._packages, 0o700)
@@ -118,15 +119,14 @@ class StyleVault:
         provider = self._provider
         if not encrypted:
             if provider is not None:
-                raise StyleVaultError(
-                    "Encrypted style vault refuses a legacy plaintext record"
-                )
+                raise StyleVaultError("Encrypted style vault refuses a legacy plaintext record")
             return stored
         if provider is None:
             raise StyleVaultError("Encrypted style record requires its key provider")
         try:
             payload = base64.b64decode(
-                stored[len(_ENVELOPE_PREFIX) :], validate=True
+                stored[len(_ENVELOPE_PREFIX) :],
+                validate=True,
             )
             return provider.decrypt(payload)
         except (binascii.Error, EncryptionUnavailableError) as exc:
@@ -138,10 +138,9 @@ class StyleVault:
                 raise StyleVaultError(collision)
             return
         encoded = self._encode(plaintext)
-        if not _create_once(path, encoded):
-            if self._decode(path.read_bytes()) != plaintext:
-                raise StyleVaultError(collision)
-        with __import__("contextlib").suppress(OSError):
+        if not _create_once(path, encoded) and self._decode(path.read_bytes()) != plaintext:
+            raise StyleVaultError(collision)
+        with contextlib.suppress(OSError):
             os.chmod(path, 0o600)
 
     # ── Originals ─────────────────────────────────────────────────
@@ -200,7 +199,11 @@ class StyleVault:
 
     def append_decision(self, decision: dict[str, object]) -> None:
         """Append one review decision using the vault's encryption mode."""
-        plaintext = json.dumps(decision, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        plaintext = json.dumps(
+            decision,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
         if self._provider is None:
             line = plaintext.decode("utf-8")
         else:
@@ -208,7 +211,7 @@ class StyleVault:
             line = _DECISION_PREFIX + base64.b64encode(envelope).decode("ascii")
         with self._decisions.open("a", encoding="utf-8", newline="\n") as handle:
             handle.write(line + "\n")
-        with __import__("contextlib").suppress(OSError):
+        with contextlib.suppress(OSError):
             os.chmod(self._decisions, 0o600)
 
     def read_decisions(self) -> tuple[dict[str, object], ...]:
@@ -224,7 +227,8 @@ class StyleVault:
                     raise StyleVaultError("Encrypted decision log requires its key provider")
                 try:
                     envelope = base64.b64decode(
-                        line[len(_DECISION_PREFIX) :], validate=True
+                        line[len(_DECISION_PREFIX) :],
+                        validate=True,
                     )
                 except binascii.Error as exc:
                     raise StyleVaultError("Corrupt encrypted decision log line") from exc
