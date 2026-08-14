@@ -167,16 +167,41 @@ def ingest_source_package(
     )
 
 
+def _required_int(row: dict[str, object], key: str) -> int:
+    value = row.get(key)
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ProjectStoreError(f"Stored row field {key!r} must be an integer")
+    return value
+
+
+def _optional_float(row: dict[str, object], key: str) -> float | None:
+    value = row.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ProjectStoreError(f"Stored row field {key!r} must be numeric or null")
+    return float(value)
+
+
+def _required_boolish(row: dict[str, object], key: str) -> bool:
+    value = row.get(key)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    raise ProjectStoreError(f"Stored row field {key!r} must be boolean or 0/1")
+
+
 def _claim_from_row(row: dict[str, object]) -> ClaimV2:
     try:
         return ClaimV2(
             claim_id=str(row["claim_id"]),
             canonical_proposition=str(row["proposition"]),
             modality=Modality(str(row["modality"])),
-            negation=bool(row["negation"]),
+            negation=_required_boolish(row, "negation"),
             attribution=str(row.get("attribution") or ""),
             source_evidence_refs=(),
-            confidence=(float(row["confidence"]) if row.get("confidence") is not None else None),
+            confidence=_optional_float(row, "confidence"),
             status=ClaimStatus(str(row["status"])),
             contradictions=(),
             allowed_paraphrase_scope=str(row["paraphrase_scope"]),
@@ -191,8 +216,8 @@ def _protected_span_from_row(row: dict[str, object]) -> ProtectedSpan:
             span_id=str(row["span_id"]),
             kind=SpanKind(str(row["kind"])),
             source_location=SourceLocation(
-                start_offset=int(row["start_offset"]),
-                end_offset=int(row["end_offset"]),
+                start_offset=_required_int(row, "start_offset"),
+                end_offset=_required_int(row, "end_offset"),
             ),
             text=str(row["text"]),
             status=SpanStatus.APPROVED,
