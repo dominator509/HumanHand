@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -20,6 +21,12 @@ def _isolated_vault(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "import"
+_ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+
+def _unstyle(text: str) -> str:
+    """Remove ANSI control sequences from Rich/Typer help output."""
+    return _ANSI_ESCAPE.sub("", text)
 
 
 def _invoke(command: str, path: Path, *args: str) -> Result:
@@ -146,16 +153,17 @@ class TestImportLaneHelp:
     def test_source_help(self) -> None:
         result = runner.invoke(app, ["import", "source", "--help"])
         assert result.exit_code == 0
-        assert "--json" in result.stdout
+        assert "--json" in _unstyle(result.stdout)
 
     def test_style_help(self) -> None:
         result = runner.invoke(app, ["import", "style", "--help"])
         assert result.exit_code == 0
-        assert "--json" in result.stdout
+        assert "--json" in _unstyle(result.stdout)
 
     def test_import_group_help_lists_lanes(self) -> None:
         result = runner.invoke(app, ["import", "--help"])
         assert result.exit_code == 0
-        assert "source" in result.stdout
-        assert "style" in result.stdout
-        assert "inspect" in result.stdout
+        help_text = _unstyle(result.stdout)
+        assert "source" in help_text
+        assert "style" in help_text
+        assert "inspect" in help_text
