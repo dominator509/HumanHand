@@ -144,8 +144,7 @@ class TestTextAndMarkdownAuditors:
 
     def test_missing_ordered_content_and_identifier_fail(self, tmp_path: Path) -> None:
         data = TXT_EXPORTER.export_bytes(sample_document())[:-1]
-        data += b" project_id=42\n"
-        artifact = write(tmp_path / "identifier.txt", data)
+        artifact = write(tmp_path / "identifier.txt", data + b" project_id=42\n")
         assert AuditCode.METADATA_PROHIBITED in error_codes(
             TextAuditor().audit_file(artifact, expected=sample_document())
         )
@@ -204,9 +203,7 @@ class TestUnicodeAuditor:
         assert {finding.code for finding in nfd} == {AuditCode.UNICODE_NOT_NFC}
 
         surrogate = UnicodeAuditor.scan_unicode_text("bad\ud800char")
-        assert {finding.code for finding in surrogate} == {
-            AuditCode.UNICODE_SURROGATES
-        }
+        assert {finding.code for finding in surrogate} == {AuditCode.UNICODE_SURROGATES}
 
 
 @pytest.mark.importers
@@ -412,9 +409,7 @@ class TestRegistryAndPackageAuditor:
         )
         report = audit_artifact(artifact, expected=sample_document())
         assert report.status is ArtifactAuditStatus.PASS
-        assert {finding.code for finding in report.findings} == {
-            AuditCode.FORMAT_UNKNOWN
-        }
+        assert {finding.code for finding in report.findings} == {AuditCode.FORMAT_UNKNOWN}
 
         report = audit_artifact(
             write(tmp_path / "binary.xyz", b"\xff"),
