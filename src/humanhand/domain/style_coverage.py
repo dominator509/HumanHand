@@ -51,9 +51,7 @@ def build_coverage_report(
     code_point_coverage = 1.0 if package.exact_surface.surface_text else 0.0
     unresolved_span_count = len(package.authorship.unresolved_spans)
     word_count = _voice_profile_word_count(package)
-    sample_sufficiency = (
-        "sufficient" if word_count >= min_words_for_sufficiency else "insufficient"
-    )
+    sample_sufficiency = "sufficient" if word_count >= min_words_for_sufficiency else "insufficient"
     unsupported_features = package.unsupported_features
     structure_coverage = 0.0 if unsupported_features else 1.0
     formatting_coverage = 0.0 if unsupported_features else 1.0
