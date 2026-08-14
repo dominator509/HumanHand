@@ -35,7 +35,7 @@ def _content_types_xml() -> str:
 def _root_rels_xml() -> str:
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        f'<Relationships xmlns="{_PK_REL_NS}">'
+        f'<Relationships xmlns="{_PKG_REL_NS}">'
         '<Relationship Id="rId1" '
         'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/'
         'officeDocument" Target="word/document.xml"/>'
