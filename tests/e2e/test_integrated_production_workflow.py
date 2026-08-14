@@ -110,9 +110,7 @@ def _complete_style_profile(style_path: Path, vault_path: Path):  # type: ignore
 
 def _public_sections(document):  # type: ignore[no-untyped-def]
     sections = tuple(
-        node.text
-        for node in document.nodes
-        if node.node_type is NodeType.PARAGRAPH and node.text
+        node.text for node in document.nodes if node.node_type is NodeType.PARAGRAPH and node.text
     )
     return sections or tuple(part for part in document.surface_text.split("\n\n") if part)
 
