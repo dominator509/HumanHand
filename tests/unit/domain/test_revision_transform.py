@@ -8,7 +8,7 @@ from humanhand.domain.canonical_document import CanonicalDocument, build_documen
 from humanhand.domain.document_nodes import NodeBuilder, NodeType, SourceLocation
 from humanhand.domain.import_policy import ImportPolicy
 from humanhand.domain.lexical_context import build_contexts
-from humanhand.domain.lexical_normalizer import propose_changes
+from humanhand.domain.lexical_normalizer import LexicalProposal, propose_changes
 from humanhand.domain.lexical_types import load_bundled_rules
 from humanhand.domain.protected_spans import ProtectedSpanSet
 from humanhand.domain.revision_transform import apply_reviewed_proposal
@@ -35,7 +35,7 @@ def _document(text: str, node_type: NodeType = NodeType.PARAGRAPH) -> CanonicalD
     )
 
 
-def _proposal(document: CanonicalDocument):  # type: ignore[no-untyped-def]
+def _proposal(document: CanonicalDocument) -> LexicalProposal:
     spans = ProtectedSpanSet(spans=())
     return propose_changes(
         document.surface_text,
