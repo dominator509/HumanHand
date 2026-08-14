@@ -1,4 +1,10 @@
-"""Optional SQLite detector-score cache — stores metadata only, never user text."""
+"""Optional SQLite detector-score cache — stores metadata only, never user text.
+
+The cache constructor accepts either an explicit SQLite file path or a cache
+directory. Directory-like paths resolve to ``detector_scores.db`` so callers
+that configure a cache directory and callers that configure a database file
+share one unambiguous boundary.
+"""
 
 from __future__ import annotations
 
@@ -17,6 +23,8 @@ class CacheError(Exception):
 
 
 SCHEMA_VERSION = 1
+CACHE_DB_FILENAME = "detector_scores.db"
+_SQLITE_SUFFIXES = frozenset({".db", ".sqlite", ".sqlite3"})
 
 CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS detector_scores (
@@ -64,6 +72,23 @@ FORBIDDEN_JSON_FIELD_TOKENS = {
     "response",
     "message",
 }
+
+
+def _resolve_db_path(value: str | Path) -> Path:
+    """Resolve a configured cache location to an SQLite database file.
+
+    Existing directories and nonexistent extensionless paths are interpreted
+    as cache directories. Existing files and paths ending in a conventional
+    SQLite suffix are interpreted as explicit database files. The rule is
+    deterministic and fixes the health-before-verify failure where ``health``
+    created the configured cache directory before ``verify`` opened SQLite.
+    """
+    path = Path(value)
+    if path.exists():
+        return path / CACHE_DB_FILENAME if path.is_dir() else path
+    if path.suffix.lower() in _SQLITE_SUFFIXES:
+        return path
+    return path / CACHE_DB_FILENAME
 
 
 def _validate_no_text_columns(conn: sqlite3.Connection) -> None:
@@ -136,10 +161,16 @@ class DetectorScoreCache:
         """Initialize cache connection.
 
         Args:
-            db_path: Path to the SQLite database file.
+            db_path: Explicit SQLite database path or cache directory. A
+                directory-like path resolves to ``detector_scores.db``.
         """
-        self._db_path = Path(db_path)
+        self._db_path = _resolve_db_path(db_path)
         self._conn: sqlite3.Connection | None = None
+
+    @property
+    def db_path(self) -> Path:
+        """Resolved SQLite database path, exposed for diagnostics and tests."""
+        return self._db_path
 
     @property
     def conn(self) -> sqlite3.Connection:
