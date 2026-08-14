@@ -22,6 +22,7 @@ from humanhand.domain.claims_v2 import (
 )
 from humanhand.domain.context_capsule import ContextCapsule, build_context_capsule
 from humanhand.domain.context_policy import ContextPolicy
+from humanhand.domain.document_nodes import SourceLocation
 from humanhand.domain.document_serialization import document_to_json
 from humanhand.domain.entities import Entity, EntityType, build_entities_from_package
 from humanhand.domain.lexical_context import build_contexts
@@ -53,7 +54,6 @@ from humanhand.domain.structure_signature import compute_structure_signature
 from humanhand.domain.style_compare import StyleComparisonReport, compare_profile
 from humanhand.domain.style_profiles import StyleEvidenceProfile
 from humanhand.domain.types import DomainError
-from humanhand.domain.document_nodes import SourceLocation
 from humanhand.infra.stores.integrated_project_store import (
     IntegratedProjectStore,
     StoredRevisionContent,
@@ -314,14 +314,18 @@ def finalize_reviewed_revision(
         state.content.accepted_text, transformed.surface_text
     )
     if not facts_ok:
-        raise DomainError("Finalization fact/citation validation failed: " + ";".join(fact_findings))
+        raise DomainError(
+            "Finalization fact/citation validation failed: " + ";".join(fact_findings)
+        )
 
     transformed_signature = compute_structure_signature(transformed)
     structure_ok, structure_findings = revalidate_structure(
         transformed_signature, state.revision.structure_signature
     )
     if not structure_ok:
-        raise DomainError("Finalization structure validation failed: " + ";".join(structure_findings))
+        raise DomainError(
+            "Finalization structure validation failed: " + ";".join(structure_findings)
+        )
 
     style_report: StyleComparisonReport | None = None
     if profile is not None:
@@ -348,8 +352,6 @@ def finalize_reviewed_revision(
     )
 
     with store.atomic():
-        # Re-read the accepted head inside the transaction to reject a stale
-        # proposal before any write becomes durable.
         current = store.latest_accepted_revision(state.revision.document_id)
         if current is None or current.revision_id != state.revision.revision_id:
             raise DomainError("Accepted revision changed while finalization was pending")
