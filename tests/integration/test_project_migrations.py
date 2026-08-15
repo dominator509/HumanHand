@@ -16,7 +16,6 @@ from humanhand.infra.stores.migration_runner import (
 )
 from humanhand.infra.stores.project_layout import init_layout, layout_for
 from humanhand.infra.stores.project_schema import MIGRATIONS, PROJECT_SCHEMA_VERSION
-from humanhand.infra.stores.project_store import ProjectStore
 
 
 def _tables(conn: sqlite3.Connection) -> set[str]:
@@ -51,7 +50,11 @@ class TestApplyMigrations:
         conn = _open_connection(tmp_path)
         try:
             assert current_version(conn) == 0
-            final = apply_migrations(conn, backup_path=backup)
+            final = apply_migrations(
+                conn,
+                backup_path=backup,
+                target_version=PROJECT_SCHEMA_VERSION,
+            )
             assert final == PROJECT_SCHEMA_VERSION
             assert current_version(conn) == PROJECT_SCHEMA_VERSION
             assert _tables(conn) == _EXPECTED_TABLES
@@ -64,13 +67,24 @@ class TestApplyMigrations:
         db = layout_for(tmp_path).database
         backup = db.with_name("project.db.bak")
         conn = _open_connection(tmp_path)
-        apply_migrations(conn, backup_path=backup)
+        apply_migrations(
+            conn,
+            backup_path=backup,
+            target_version=PROJECT_SCHEMA_VERSION,
+        )
         conn.close()
         assert backup.is_file()
         backup_bytes = backup.read_bytes()
         conn = _open_connection(tmp_path)
         try:
-            assert apply_migrations(conn, backup_path=backup) == PROJECT_SCHEMA_VERSION
+            assert (
+                apply_migrations(
+                    conn,
+                    backup_path=backup,
+                    target_version=PROJECT_SCHEMA_VERSION,
+                )
+                == PROJECT_SCHEMA_VERSION
+            )
         finally:
             conn.close()
         assert backup.read_bytes() == backup_bytes
@@ -86,7 +100,14 @@ class TestApplyMigrations:
         backup = db.with_name("project.db.bak")
         conn = _open_connection(tmp_path)
         try:
-            assert apply_migrations(conn, backup_path=backup) == PROJECT_SCHEMA_VERSION
+            assert (
+                apply_migrations(
+                    conn,
+                    backup_path=backup,
+                    target_version=PROJECT_SCHEMA_VERSION,
+                )
+                == PROJECT_SCHEMA_VERSION
+            )
             assert {"schema_migrations", "legacy_notes", "revision_contents"} <= _tables(conn)
             row = conn.execute("SELECT note FROM legacy_notes").fetchone()
             assert row == ("keep me",)
@@ -108,7 +129,14 @@ class TestRollback:
         before = db.read_bytes()
         conn = _open_connection(tmp_path)
         try:
-            assert apply_migrations(conn, backup_path=backup) == PROJECT_SCHEMA_VERSION
+            assert (
+                apply_migrations(
+                    conn,
+                    backup_path=backup,
+                    target_version=PROJECT_SCHEMA_VERSION,
+                )
+                == PROJECT_SCHEMA_VERSION
+            )
         finally:
             conn.close()
         after = db.read_bytes()
@@ -134,15 +162,22 @@ class TestMigrationFailure:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         init_layout(tmp_path, name="test-project")
+        db = layout_for(tmp_path).database
+        backup = db.with_name("project.db.bak")
         broken = (
             PROJECT_SCHEMA_VERSION + 1,
             "CREATE TABLE broken (id INTEGER PRIMARY KEY); THIS IS NOT VALID SQL;",
         )
         monkeypatch.setattr(migration_runner_module, "MIGRATIONS", MIGRATIONS + (broken,))
-        with pytest.raises(MigrationError):
-            ProjectStore(tmp_path)
-        conn = sqlite3.connect(str(layout_for(tmp_path).database))
+        monkeypatch.setattr(migration_runner_module, "PROJECT_SCHEMA_VERSION", broken[0])
+        conn = _open_connection(tmp_path)
         try:
+            with pytest.raises(MigrationError):
+                apply_migrations(
+                    conn,
+                    backup_path=backup,
+                    target_version=broken[0],
+                )
             assert current_version(conn) == PROJECT_SCHEMA_VERSION
             assert "broken" not in _tables(conn)
         finally:
@@ -159,7 +194,7 @@ class TestUpgradeFromV1:
         monkeypatch.setattr(migration_runner_module, "MIGRATIONS", (MIGRATIONS[0],))
         conn = _open_connection(tmp_path)
         try:
-            assert apply_migrations(conn, backup_path=backup) == 1
+            assert apply_migrations(conn, backup_path=backup, target_version=1) == 1
             conn.execute(
                 """INSERT INTO claims
                    (claim_id, document_id, proposition, modality, negation, attribution,
@@ -174,7 +209,14 @@ class TestUpgradeFromV1:
         monkeypatch.setattr(migration_runner_module, "MIGRATIONS", MIGRATIONS)
         conn = _open_connection(tmp_path)
         try:
-            assert apply_migrations(conn, backup_path=backup) == PROJECT_SCHEMA_VERSION
+            assert (
+                apply_migrations(
+                    conn,
+                    backup_path=backup,
+                    target_version=PROJECT_SCHEMA_VERSION,
+                )
+                == PROJECT_SCHEMA_VERSION
+            )
             assert conn.execute("SELECT proposition FROM claims").fetchone() == ("keep me",)
             assert "revision_contents" in _tables(conn)
         finally:

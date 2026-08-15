@@ -24,6 +24,7 @@ from humanhand.application.style_services import (
     record_review_decision,
 )
 from humanhand.domain.artifact_findings import ArtifactAuditStatus
+from humanhand.domain.canonical_document import CanonicalDocument
 from humanhand.domain.document_nodes import NodeType
 from humanhand.domain.export_contract import ExportFormat, ExportRequest
 from humanhand.domain.lexical_review import ReviewDecision, build_review_journal
@@ -108,7 +109,7 @@ def _complete_style_profile(style_path: Path, vault_path: Path):  # type: ignore
     return profile
 
 
-def _public_sections(document):  # type: ignore[no-untyped-def]
+def _public_sections(document: CanonicalDocument) -> tuple[str, ...]:
     sections = tuple(
         node.text for node in document.nodes if node.node_type is NodeType.PARAGRAPH and node.text
     )
@@ -160,7 +161,7 @@ def test_full_integrated_pre_slm_workflow(tmp_path: Path) -> None:
             block_id=block_id,
             profile=profile,
         )
-        assert capsule.style_profile_id == profile.profile_id
+        assert initial.content.style_profile_id == profile.profile_id
         assert capsule.style_hard_invariants
         assert capsule.style_soft_tendencies
 

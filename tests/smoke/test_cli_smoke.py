@@ -187,7 +187,7 @@ class TestConsoleScriptEntryPoint:
     """Verify that pyproject.toml defines the console script entry point."""
 
     def test_entry_point_in_pyproject_toml(self) -> None:
-        """humanhand = "humanhand.cli.app:app" must exist in pyproject.toml."""
+        """The installed console script must use the integrated root application."""
         import tomllib
 
         with open("pyproject.toml", "rb") as f:
@@ -197,6 +197,6 @@ class TestConsoleScriptEntryPoint:
         assert "humanhand" in scripts, (
             'Missing [project.scripts] entry "humanhand" in pyproject.toml'
         )
-        assert scripts["humanhand"] == "humanhand.cli.app:app", (
-            f'Expected "humanhand.cli.app:app", got "{scripts["humanhand"]}"'
+        assert scripts["humanhand"] == "humanhand.cli.root_app:app", (
+            f'Expected "humanhand.cli.root_app:app", got "{scripts["humanhand"]}"'
         )

@@ -1,43 +1,119 @@
-# HumanHand Future SLM Handoff Contract
+# HumanHand Local Writer Handoff Contract
 
-This document is documentation only. It defines the boundary a future writer may use
-after the Pre-SLM program is complete. It does not add a model, runtime, training stack,
-model registry, download path, or semantic-repair implementation.
+This document supersedes the documentation-only Pre-SLM handoff after EP-019. It authorizes
+implementation only through EP-020 through EP-028 and the associated accepted specs/ADRs.
 
-## Future Interface
+## Canonical Model Strategy
+
+```text
+Primary writer:
+    Qwen3.5-2B
+    local
+    non-thinking
+    proposal-only
+    Q4_K_M GGUF production target
+
+Optional quality governor:
+    DeepSeek API
+    plan / critique / diagnose / teach
+    never final prose
+    explicit cloud opt-in
+    bounded and sanitized
+
+Authority:
+    deterministic HumanHand validators
+    explicit human approval
+
+Training:
+    consented gold records
+    HumanHand Forge
+    QLoRA SFT first
+    optional DPO
+    no automatic promotion
+```
+
+## Writer Interface
 
 ```python
 class WriterClient(Protocol):
-    def propose_patch(
-        self,
-        capsule: ContextCapsule,
-        generation: GenerationSettings,
-    ) -> EditPatch:
+    def propose(self, request: WriterRequest) -> WriterResult:
         ...
 ```
 
-The future writer returns a proposal. It is never authoritative.
+The model receives a `WriterContextCapsuleV2` and optional `GovernorGuidance`. It returns candidates
+that strictly parse as `EditPatch` or `Abstention`.
+
+## EditPatch Authority
+
+A patch is a proposal, never authoritative. It must contain exact capsule/project/document/revision/
+block/base-text anchors and may replace only one authorized block. Unknown fields, reasoning, tool
+calls, multi-block edits, or stale anchors fail closed.
 
 ## Required Validators
 
-Before acceptance, a future proposal must pass:
+Before a patch can reach human review:
 
-- canonical schema and deterministic serialization checks;
-- protected spans, claims, citations, quotations, entities, and structure checks;
-- style hard invariants, approved-authorship, and coverage checks;
-- privacy, retention, and public-document boundary checks;
-- output encoding, metadata, package, and independent artifact audits;
-- lexical/fact/revision validation and explicit human review;
-- policy checks that reject detector optimization, provenance destruction, and private
-  external submission.
+- schema/version and unknown-field validation;
+- capsule/revision/block/base-hash integrity;
+- authorized scope and output limits;
+- tokenizer special-token and Unicode controls;
+- protected spans, numbers, dates, units, currency, identifiers;
+- citations and quotations;
+- claims, modality, negation, attribution, and entities;
+- structure;
+- style hard invariants and prohibited changes;
+- privacy and retention policy;
+- optimistic revision state.
 
-## Explicit Exclusions
+Only a human decision can authorize application to an accepted revision. Public artifacts are still
+created only by non-AI clean-room exporters and independent auditors.
 
-The Pre-SLM repository must not contain `training/`, model weights, GGUF files, LoRA
-adapters, model download scripts, `local_writer.py`, `runtime_supervisor.py`,
-`model_registry.py`, or `semantic_repair.py` as implementation.
+## Quality Governor Interface
 
-## Compatibility
+```python
+class QualityGovernorClient(Protocol):
+    def plan(self, request: PlanningRequest) -> PlanningReport: ...
+    def critique(self, request: CritiqueRequest) -> CritiqueReport: ...
+    def diagnose(self, request: DiagnosisRequest) -> DiagnosisReport: ...
+```
 
-The current `health`, `rewrite`, `verify`, `diff-facts`, and `scrub` commands remain
-available until a later major-version decision changes them.
+The governor cannot return or apply accepted document prose. `NullQualityGovernor` is mandatory and
+strict-local blocks cloud calls.
+
+## Training Boundary
+
+Gold targets require consent, rights/provenance, reviewed authorship, and human acceptance.
+HumanHand Forge is a separate training control plane. It may automate experiments but cannot add
+data, change validators/release gates, promote, publish, or deploy a model.
+
+## Program Files
+
+- `.agent/programs/LOCAL-WRITER-HYBRID-TRAINING-PROGRAM.md`
+- `LOCAL_WRITER_HYBRID_ARCHITECTURE.md`
+- `DEEPSEEK_GOVERNOR_POLICY.md`
+- `TRAINING_DATA_GOVERNANCE.md`
+- `HUMANHAND_FORGE_ARCHITECTURE.md`
+- `MODEL_RELEASE_GATES.md`
+- ADR-009 through ADR-015
+- SPEC-018 through SPEC-026
+- EP-020 through EP-028
+
+## Permanent Fallbacks
+
+HumanHand must continue to work in:
+
+- deterministic/manual mode with no local model;
+- local-writer mode with no DeepSeek;
+- strict-local mode with no network;
+- prior-model rollback mode.
+
+## Explicitly Prohibited
+
+- direct model database/file/export writes;
+- model-authored final artifacts;
+- automatic training consent/authorship inference;
+- unbounded self-improvement;
+- hidden cloud calls;
+- detector-score optimization;
+- watermark-key recovery or provenance destruction;
+- automatic model promotion or publication.
