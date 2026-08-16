@@ -9,7 +9,7 @@ The future SLM must enter after this workflow, not bypass it.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from humanhand.domain.canonical_document import CanonicalDocument
 from humanhand.domain.citations import Citation, extract_citations
@@ -319,6 +319,42 @@ def propose_integrated_lexical_changes(
     )
 
 
+def _rebase_protected_spans(
+    *,
+    spans: tuple[ProtectedSpan, ...],
+    proposal: LexicalProposal,
+    accepted_change_ids: frozenset[str],
+    transformed_text: str,
+) -> tuple[ProtectedSpan, ...]:
+    """Shift stored source offsets across accepted non-overlapping edits."""
+    accepted = tuple(
+        change for change in proposal.changes if change.change_id in accepted_change_ids
+    )
+    rebased: list[ProtectedSpan] = []
+    for span in spans:
+        location = span.source_location
+        shift = 0
+        for change in accepted:
+            change_end = change.offset + change.length
+            if change_end <= location.start_offset:
+                shift += len(change.target) - change.length
+            elif change.offset < location.end_offset:
+                raise DomainError(
+                    f"Accepted lexical change overlaps protected span: {span.span_id}"
+                )
+        rebased_location = replace(
+            location,
+            start_offset=location.start_offset + shift,
+            end_offset=location.end_offset + shift,
+        )
+        rebased_range = slice(rebased_location.start_offset, rebased_location.end_offset)
+        rebased_text = transformed_text[rebased_range]
+        if rebased_text != span.text:
+            raise DomainError(f"Protected span rebase failed: {span.span_id}")
+        rebased.append(replace(span, source_location=rebased_location))
+    return tuple(rebased)
+
+
 def finalize_reviewed_revision(
     *,
     state: LoadedDocumentState,
@@ -330,6 +366,12 @@ def finalize_reviewed_revision(
     """Apply reviewed changes, revalidate, and commit a new accepted revision."""
     reviewed = apply_review(proposal, journal)
     transformed = apply_reviewed_proposal(state.document, reviewed)
+    rebased_spans = _rebase_protected_spans(
+        spans=state.protected_spans,
+        proposal=proposal,
+        accepted_change_ids=frozenset(change.change_id for change in reviewed.changes),
+        transformed_text=transformed.surface_text,
+    )
 
     facts_ok, fact_findings = revalidate_facts_and_citations(
         state.content.accepted_text, transformed.surface_text
@@ -384,6 +426,7 @@ def finalize_reviewed_revision(
             style_profile_id=profile.profile_id if profile else "",
             finalization_run_id=proposal.run_id,
         )
+        store.save_protected_spans(state.revision.document_id, rebased_spans)
         store.record_approval(
             target_kind="revision",
             target_id=f"{state.revision.document_id}:{accepted_revision.revision_id}",

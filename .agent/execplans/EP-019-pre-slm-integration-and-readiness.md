@@ -1,10 +1,10 @@
 ---
 id: EP-019
 title: Pre-SLM Integration, Migration, and Readiness
-status: planned
-owner: claude
+status: completed
+owner: codex
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-08-15
 ---
 
 # EP-019: Pre-SLM Integration and Readiness
@@ -87,20 +87,42 @@ user data, and keep release/publish actions explicitly outside this plan.
 
 ## Progress
 
-- [ ] M1
-- [ ] M2
-- [ ] M3
-- [ ] M4
+- [x] M1
+- [x] M2
+- [x] M3
+- [x] M4
 
 ## Surprises & Discoveries
 
-Record final compatibility, packaging, CI, and external-gate evidence.
+- A fresh worktree initially had only runtime dependencies, so the first pre-SLM E2E
+  invocation fell through to a global pytest and could not import `humanhand`. Running
+  the documented `sh scripts/install.sh` restored the locked development environment;
+  the rerun passed 399 tests with 12 intentional skips.
+- The integrated lifecycle fixture used the valid month-first date
+  `August 30, 2026`, but the deterministic source-evidence grammar recognized only ISO,
+  numeric, and day-first month-name dates. The missing span also hid a second defect:
+  accepted length-changing lexical edits persisted stale protected-span offsets.
+- The final loop exposed a Ruff lint/format expression-shape conflict. Naming the slice
+  kept both checks enabled and made the source stable under both tools.
 
 ## Decision Log
 
-Record integration, migration, dependency, release, and risk-acceptance decisions.
+- Extended the existing deterministic date grammar for month-first English dates rather
+  than adding a parser dependency or changing the public evidence contract.
+- Rebased protected-span offsets from accepted lexical changes before persistence,
+  failed closed on overlap or text mismatch, and saved the spans in the same transaction
+  as revision content and approval.
+- Retained `.github/workflows/ep019-format.yml`: its target branch still exists on the
+  remote, so it is live branch-specific automation rather than orphaned configuration.
+- Limited the audit fix to the integration service, evidence extractor, their regression
+  tests, and this required ExecPlan record; no SLM, release, publish, or deployment work
+  was authorized.
 
 ## Outcomes & Retrospective
 
-Complete only when the readiness report is honest, all prior plans are audited, and the
-repository is explicitly stopped before SLM work.
+Completed the Codex audit/fix boundary with six end-to-end debug passes. The final
+post-fix pre-SLM suite passed 399 tests with 12 intentional skips, and the canonical
+`sh scripts/loop.sh` boundary completed the full verifier, wheel build, isolated install,
+and installed CLI checks with `build: complete`. The five legacy CLI commands remain
+available, live/external calls remain gated, and work stops here before EP-020 or any SLM
+implementation.

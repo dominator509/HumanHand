@@ -192,6 +192,13 @@ def test_full_integrated_pre_slm_workflow(tmp_path: Path) -> None:
         assert "utilize" not in accepted.content.accepted_text.lower()
         assert "use the available evidence" in accepted.content.accepted_text.lower()
         assert "August 30, 2026" in accepted.content.accepted_text
+        assert accepted.protected_spans
+        for span in accepted.protected_spans:
+            location = span.source_location
+            assert (
+                accepted.document.surface_text[location.start_offset : location.end_offset]
+                == span.text
+            )
     finally:
         store.close()
 
