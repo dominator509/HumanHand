@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 concurrency:
   group: release-candidate-${{ github.event.pull_request.number || github.ref }}
@@ -175,3 +176,65 @@ jobs:
       - name: Confirm no publication occurred
         shell: bash
         run: echo "release candidate verified; no tag, release, deployment, or PyPI publish performed"
+
+  report-release-status:
+    name: Report release-candidate status
+    needs: [build-release-bundle, verify-exact-artifact, release-gate]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Publish classic commit status
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUILD_RESULT: ${{ needs.build-release-bundle.result }}
+          VERIFY_RESULT: ${{ needs.verify-exact-artifact.result }}
+          GATE_RESULT: ${{ needs.release-gate.result }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import urllib.request
+
+          results = {
+              "build": os.environ["BUILD_RESULT"],
+              "verify": os.environ["VERIFY_RESULT"],
+              "gate": os.environ["GATE_RESULT"],
+          }
+          success = all(value == "success" for value in results.values())
+          state = "success" if success else "failure"
+          description = (
+              "Exact release bundle passed source/build/install gates"
+              if success
+              else "Release candidate failed; inspect Actions run"
+          )
+          repository = os.environ["GITHUB_REPOSITORY"]
+          candidate_sha = os.environ["CANDIDATE_SHA"]
+          run_id = os.environ["GITHUB_RUN_ID"]
+          payload = json.dumps(
+              {
+                  "state": state,
+                  "target_url": f"https://github.com/{repository}/actions/runs/{run_id}",
+                  "description": description,
+                  "context": "humanhand/release-candidate",
+              }
+          ).encode("utf-8")
+          request = urllib.request.Request(
+              f"https://api.github.com/repos/{repository}/statuses/{candidate_sha}",
+              data=payload,
+              method="POST",
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                  "Content-Type": "application/json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              if response.status != 201:
+                  raise SystemExit(f"unexpected status API response: {response.status}")
+          print(f"reported {state} release-candidate status for {candidate_sha}")
+          PY
