@@ -21,9 +21,11 @@ env/
 htmlcov/
 coverage.xml
 
-# Build artifacts
+# Build and release-candidate artifacts
 build/
 dist/
+release-bundle/
+release-gate/
 
 # Local configuration and secrets
 .env
