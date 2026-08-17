@@ -47,9 +47,12 @@ def test_release_artifact_is_immutable_retained_and_addressable() -> None:
     assert "if-no-files-found: error" in build
     assert "retention-days: 30" in build
     assert "overwrite: false" in build
-    assert "artifact-id:" in build
-    assert "artifact-url:" in build
-    assert "artifact-digest:" in build
+    assert "artifact_id:" in build
+    assert "artifact_url:" in build
+    assert "artifact_digest:" in build
+    assert "steps.upload-release.outputs.artifact-id" in build
+    assert "steps.upload-release.outputs.artifact-url" in build
+    assert "steps.upload-release.outputs.artifact-digest" in build
 
 
 def test_release_gate_is_separate_and_external_gates_are_not_fabricated() -> None:
