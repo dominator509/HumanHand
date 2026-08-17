@@ -23,7 +23,7 @@ def test_release_workflow_runs_for_pr_main_and_manual_dispatch() -> None:
     assert "  pull_request:\n    branches: [main]" in text
     assert "  push:\n    branches: [main]" in text
     assert "  workflow_dispatch:" in text
-    assert "permissions:\n  contents: read" in text
+    assert "permissions:\n  contents: read\n  statuses: write" in text
 
 
 def test_release_workflow_builds_once_and_verifies_the_same_artifact() -> None:
@@ -57,11 +57,22 @@ def test_release_artifact_is_immutable_retained_and_addressable() -> None:
 
 def test_release_gate_is_separate_and_external_gates_are_not_fabricated() -> None:
     text = _workflow_text()
-    gate = _job_block(text, "release-gate")
+    gate = _job_block(text, "release-gate", "report-release-status")
     assert "release-gate/RELEASE_GATE.json" in gate
     assert "--attestation-status unavailable" in gate
     assert "humanhand-release-gate-${{ needs.build-release-bundle.outputs.candidate_sha }}" in gate
     assert "no tag, release, deployment, or PyPI publish performed" in gate
+
+
+def test_release_status_is_always_reported_without_exposing_the_token() -> None:
+    text = _workflow_text()
+    status = _job_block(text, "report-release-status")
+    assert "if: ${{ always() }}" in status
+    assert "humanhand/release-candidate" in status
+    assert "GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}" in status
+    assert "statuses/${candidate_sha}" in status
+    assert "print(os.environ['GH_TOKEN'])" not in status
+    assert "print(os.environ[\"GH_TOKEN\"])" not in status
 
 
 def test_release_workflow_pins_third_party_actions() -> None:
