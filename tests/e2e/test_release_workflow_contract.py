@@ -68,6 +68,9 @@ def test_release_status_is_always_reported_without_exposing_the_token() -> None:
     text = _workflow_text()
     status = _job_block(text, "report-release-status")
     assert "if: ${{ always() }}" in status
+    assert "humanhand/release-build" in status
+    assert "humanhand/release-install" in status
+    assert "humanhand/release-gate" in status
     assert "humanhand/release-candidate" in status
     assert "GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}" in status
     assert "statuses/${candidate_sha}" in status
