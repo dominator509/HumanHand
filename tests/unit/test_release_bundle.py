@@ -35,15 +35,17 @@ def _record_digest(payload: bytes) -> str:
     return "sha256=" + encoded.decode("ascii")
 
 
-def _write_wheel(path: Path, *, unsafe_name: str | None = None, corrupt_record: bool = False) -> None:
+def _write_wheel(
+    path: Path, *, unsafe_name: str | None = None, corrupt_record: bool = False
+) -> None:
     dist_info = f"humanhand-{VERSION}.dist-info"
     members: dict[str, bytes] = {
         "humanhand/__init__.py": b'__version__ = "1.1.0"\n',
         "humanhand/cli/root_app.py": b"def app():\n    return None\n",
-        f"{dist_info}/METADATA": (
-            "Metadata-Version: 2.3\nName: humanhand\nVersion: 1.1.0\n\n"
-        ).encode(),
-        f"{dist_info}/WHEEL": b"Wheel-Version: 1.0\nGenerator: test\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+        f"{dist_info}/METADATA": (b"Metadata-Version: 2.3\nName: humanhand\nVersion: 1.1.0\n\n"),
+        f"{dist_info}/WHEEL": (
+            b"Wheel-Version: 1.0\nGenerator: test\nRoot-Is-Purelib: true\nTag: py3-none-any\n"
+        ),
         f"{dist_info}/entry_points.txt": (
             b"[console_scripts]\nhumanhand = humanhand.cli.root_app:app\n"
         ),
@@ -85,10 +87,7 @@ def _write_sdist(path: Path) -> None:
         _add_tar_bytes(
             archive,
             f"{root}/pyproject.toml",
-            (
-                b"[project]\nname='humanhand'\nversion='1.1.0'\n"
-                b"requires-python='>=3.11,<3.12'\n"
-            ),
+            (b"[project]\nname='humanhand'\nversion='1.1.0'\nrequires-python='>=3.11,<3.12'\n"),
         )
         _add_tar_bytes(archive, f"{root}/src/humanhand/__init__.py", b"\n")
 
@@ -96,8 +95,7 @@ def _write_sdist(path: Path) -> None:
 def _write_project(root: Path) -> Path:
     pyproject = root / "pyproject.toml"
     pyproject.write_text(
-        "[project]\nname='humanhand'\nversion='1.1.0'\n"
-        "requires-python='>=3.11,<3.12'\n",
+        "[project]\nname='humanhand'\nversion='1.1.0'\nrequires-python='>=3.11,<3.12'\n",
         encoding="utf-8",
     )
     return pyproject

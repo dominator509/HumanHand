@@ -17,6 +17,7 @@ Use `uv` for development. End users install the built wheel with `pip`. Do not r
 | Preflight | `sh scripts/preflight.sh` | `preflight: ok` |
 | Windows uv resolver | `sh scripts/uv.sh --version` | uv version text |
 | Install dependencies | `sh scripts/install.sh` | `install: ok` |
+| Refresh one locked dependency | `sh scripts/uv.sh lock --upgrade-package <package>` | `uv.lock` updated for the selected package |
 | Lint | `sh scripts/lint.sh` | `lint: ok` |
 | Format check | `sh scripts/format-check.sh` | `format check: ok` |
 | Format selected Python files | `sh scripts/uv.sh run ruff format <paths>` | Selected files reformatted in place |

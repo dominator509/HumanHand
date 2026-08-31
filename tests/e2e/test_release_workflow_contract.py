@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 WORKFLOW = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "release.yml"
 
 
@@ -73,9 +72,9 @@ def test_release_status_is_always_reported_without_exposing_the_token() -> None:
     assert "humanhand/release-gate" in status
     assert "humanhand/release-candidate" in status
     assert "GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}" in status
-    assert "statuses/${candidate_sha}" in status
+    assert "statuses/{candidate_sha}" in status
     assert "print(os.environ['GH_TOKEN'])" not in status
-    assert "print(os.environ[\"GH_TOKEN\"])" not in status
+    assert 'print(os.environ["GH_TOKEN"])' not in status
 
 
 def test_release_workflow_pins_third_party_actions() -> None:

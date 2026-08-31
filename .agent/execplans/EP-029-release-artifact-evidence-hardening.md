@@ -293,9 +293,9 @@ Acceptance requires every SPEC-027 criterion and:
 ## 12. Progress
 
 - [x] Milestone 1 — Contract and command registration drafted.
-- [ ] Milestone 2 — Deterministic bundle tooling.
-- [ ] Milestone 3 — Build and clean-install wrappers.
-- [ ] Milestone 4 — Build-once release workflow.
+- [x] Milestone 2 — Deterministic bundle tooling.
+- [x] Milestone 3 — Build and clean-install wrappers.
+- [x] Milestone 4 — Build-once release workflow.
 - [ ] Milestone 5 — Documentation and complete validation.
 
 ## 13. Surprises & Discoveries
@@ -307,6 +307,19 @@ Acceptance requires every SPEC-027 criterion and:
   broken external digest.
 - 2026-08-17: GitHub private-repository signed attestations may require Enterprise Cloud. The plan
   treats signing as optional capability evidence and never claims it when unavailable.
+- 2026-08-31: The first hosted CI and Release Candidate runs both stopped at the same 11 Ruff
+  findings in the release tool/tests before packaging; the Windows CI job was cancelled by
+  fail-fast and did not provide evidence of a platform-specific failure.
+- 2026-08-31: The workflow-contract test expected a Bash-style status URL even though the workflow
+  correctly constructs the endpoint in Python. Updating the stale assertion made all seven
+  workflow-contract tests pass without changing the workflow.
+- 2026-08-31: Full verification then found `PYSEC-2026-3721` in locked `pip` 26.1.2. Refreshing
+  only that transitive development dependency to 26.2.1 made the dependency audit and full
+  verification pass.
+- 2026-08-31: `sh scripts/production-readiness-check.sh` stops before artifact validation because
+  the long-standing required-document list names missing root files `PRIVACY.md` and `SUPPORT.md`.
+  Creating policy/support contracts is outside this CI remediation and would require maintainer
+  content decisions, so Milestone 5 remains incomplete.
 
 ## 14. Decision Log
 
@@ -324,6 +337,22 @@ Acceptance requires every SPEC-027 criterion and:
 - 2026-08-17 — Add EP-029 ahead of SLM implementation under explicit user direction. Reason: this
   is a release-baseline remediation and does not implement EP-020–EP-028. Consequence: SLM plan
   sequence remains unchanged after this remediation.
+- 2026-08-31 — Reconcile the previously audited EP-019 fix commit with the EP-029 PR branch rather
+  than discard either line of work. Reason: the local worktree and PR branch had diverged from the
+  same merged-main baseline. Consequence: PR #3 contains the validated EP-019 fixes as well as the
+  EP-029 release hardening.
+- 2026-08-31 — Fix the release code/tests to satisfy the repository's existing Ruff contract and
+  preserve tar archive lifetime through a small `_open_sdist` helper. Reason: both hosted workflows
+  failed before executing their release behavior. Consequence: no lint rule or test gate was
+  weakened.
+- 2026-08-31 — Permit one lockfile-only exception to the original no-dependency-change expectation
+  and register the selective uv lock refresh command. Reason: the vulnerability database began
+  rejecting locked `pip` 26.1.2 during this remediation. Consequence: only `pip` moved to 26.2.1;
+  runtime dependencies and declared version ranges are unchanged.
+- 2026-08-31 — Do not fabricate missing privacy or support policy documents to make the local
+  readiness wrapper pass. Reason: those documents require maintainer-owned operational and policy
+  content, while the hosted CI/release workflows can validate the implementation independently.
+  Consequence: production readiness remains fail-closed even if CI becomes green.
 
 ## 15. Outcomes & Retrospective
 

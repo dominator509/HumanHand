@@ -24,7 +24,7 @@ import tarfile
 import tomllib
 import zipfile
 from collections.abc import Iterable, Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.parser import BytesParser
 from pathlib import Path, PurePosixPath
 from typing import Any, Final
@@ -44,9 +44,7 @@ FIXED_EVIDENCE_NAMES: Final = (
     "release-provenance.json",
 )
 FIXED_CONTROL_NAMES: Final = ("release-manifest.json", "SHA256SUMS")
-FORBIDDEN_COMPONENTS: Final = frozenset(
-    {".git", ".github", ".cache", ".venv", "__pycache__"}
-)
+FORBIDDEN_COMPONENTS: Final = frozenset({".git", ".github", ".cache", ".venv", "__pycache__"})
 FORBIDDEN_SUFFIXES: Final = (
     ".pyc",
     ".pyo",
@@ -262,8 +260,7 @@ def inspect_wheel(path: Path, expected_version: str) -> dict[str, Any]:
             missing_record = sorted(file_names - set(record_rows))
             extra_record = sorted(set(record_rows) - file_names)
             raise ReleaseBundleError(
-                "wheel RECORD membership mismatch "
-                f"(missing={missing_record}, extra={extra_record})"
+                f"wheel RECORD membership mismatch (missing={missing_record}, extra={extra_record})"
             )
 
         record_name = f"{dist_info}/RECORD"
@@ -271,7 +268,9 @@ def inspect_wheel(path: Path, expected_version: str) -> dict[str, Any]:
             payload = archive.read(member_name)
             if member_name == record_name:
                 if digest_field or size_field:
-                    raise ReleaseBundleError("wheel RECORD self-entry must have empty digest and size")
+                    raise ReleaseBundleError(
+                        "wheel RECORD self-entry must have empty digest and size"
+                    )
                 continue
             if not digest_field.startswith("sha256="):
                 raise ReleaseBundleError(f"wheel RECORD lacks SHA-256 for {member_name}")
@@ -294,15 +293,17 @@ def inspect_wheel(path: Path, expected_version: str) -> dict[str, Any]:
     }
 
 
-def inspect_sdist(path: Path, expected_version: str) -> dict[str, Any]:
-    """Inspect source-distribution safety and package metadata."""
+def _open_sdist(path: Path) -> tarfile.TarFile:
     try:
-        archive = tarfile.open(path, mode="r:gz")
+        return tarfile.open(path, mode="r:gz")
     except (OSError, tarfile.TarError) as exc:
         raise ReleaseBundleError(f"invalid source distribution: {path.name}") from exc
 
+
+def inspect_sdist(path: Path, expected_version: str) -> dict[str, Any]:
+    """Inspect source-distribution safety and package metadata."""
     expected_root = f"humanhand-{expected_version}"
-    with archive:
+    with _open_sdist(path) as archive:
         members = archive.getmembers()
         names = [member.name.rstrip("/") for member in members]
         if len(names) != len(set(names)):
@@ -310,7 +311,9 @@ def inspect_sdist(path: Path, expected_version: str) -> dict[str, Any]:
         for member in members:
             path_value = _validate_member_name(member.name.rstrip("/"))
             if not path_value.parts or path_value.parts[0] != expected_root:
-                raise ReleaseBundleError("source distribution has an unexpected top-level directory")
+                raise ReleaseBundleError(
+                    "source distribution has an unexpected top-level directory"
+                )
             if member.issym() or member.islnk() or member.isdev() or member.isfifo():
                 raise ReleaseBundleError(
                     f"source distribution contains unsafe special member: {member.name}"
@@ -394,7 +397,9 @@ def _reset_generated_directory(target: Path, repository_root: Path) -> None:
     root = repository_root.resolve()
     resolved = target.resolve()
     if resolved == root or root not in resolved.parents:
-        raise ReleaseBundleError("bundle output must be a generated directory inside the repository")
+        raise ReleaseBundleError(
+            "bundle output must be a generated directory inside the repository"
+        )
     if resolved.exists():
         if resolved.is_symlink():
             raise ReleaseBundleError("bundle output may not be a symbolic link")
@@ -415,7 +420,9 @@ def _validate_requirements(path: Path) -> None:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         raise ReleaseBundleError("runtime requirements must be UTF-8") from exc
-    meaningful = [line.strip() for line in text.splitlines() if line.strip() and not line.startswith("#")]
+    meaningful = [
+        line.strip() for line in text.splitlines() if line.strip() and not line.startswith("#")
+    ]
     if not meaningful:
         raise ReleaseBundleError("runtime requirements are empty")
     if "-e " in text or "file:" in text.lower() or "humanhand @" in text.lower():
@@ -467,8 +474,7 @@ def _provenance_payload(
     uv_version: str,
 ) -> dict[str, Any]:
     provenance_subjects = [
-        {"name": str(item["name"]), "digest": {"sha256": str(item["sha256"])}}
-        for item in subjects
+        {"name": str(item["name"]), "digest": {"sha256": str(item["sha256"])}} for item in subjects
     ]
     invocation_id = ""
     if workflow_run_id:
@@ -540,9 +546,7 @@ def create_bundle(
     shutil.copyfile(sdist, copied_sdist)
     copied_requirements = _copy_evidence(requirements, bundle_dir, "runtime-requirements.txt")
     copied_sbom = _copy_evidence(sbom, bundle_dir, "sbom.cdx.json")
-    copied_reproducibility = _copy_evidence(
-        reproducibility, bundle_dir, "reproducibility.json"
-    )
+    copied_reproducibility = _copy_evidence(reproducibility, bundle_dir, "reproducibility.json")
 
     payloads = [
         inspect_wheel(copied_wheel, project["version"]),
@@ -576,7 +580,7 @@ def create_bundle(
         "source": {
             "candidate_sha": candidate,
             "source_date_epoch": epoch,
-            "source_timestamp_utc": datetime.fromtimestamp(epoch, timezone.utc)
+            "source_timestamp_utc": datetime.fromtimestamp(epoch, UTC)
             .isoformat()
             .replace("+00:00", "Z"),
             "repository": repository,
@@ -754,8 +758,10 @@ def verify_bundle(*, bundle_dir: Path, expected_sha: str | None = None) -> dict[
     project = manifest.get("project")
     source = manifest.get("source")
     verification = manifest.get("verification")
-    if not isinstance(project, dict) or not isinstance(source, dict) or not isinstance(
-        verification, dict
+    if (
+        not isinstance(project, dict)
+        or not isinstance(source, dict)
+        or not isinstance(verification, dict)
     ):
         raise ReleaseBundleError("release manifest has invalid object fields")
     if _normalized_name(str(project.get("name", ""))) != PROJECT_NAME:
@@ -766,7 +772,8 @@ def verify_bundle(*, bundle_dir: Path, expected_sha: str | None = None) -> dict[
     candidate = _validate_candidate_sha(str(source.get("candidate_sha", "")))
     if expected_sha is not None and candidate != _validate_candidate_sha(expected_sha):
         raise ReleaseBundleError("release bundle candidate SHA does not match expected SHA")
-    if source.get("source_date_epoch") is None or not isinstance(source.get("source_date_epoch"), int):
+    source_date_epoch = source.get("source_date_epoch")
+    if source_date_epoch is None or not isinstance(source_date_epoch, int):
         raise ReleaseBundleError("release manifest SOURCE_DATE_EPOCH is invalid")
     if verification != {
         "reproducible_build": True,
