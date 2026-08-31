@@ -327,6 +327,10 @@ Acceptance requires every SPEC-027 criterion and:
   bytes; the Ubuntu hosted builder passed the same reproducibility comparison before inspecting its
   sdist. Hosted Ubuntu remains the plan's authoritative build-once platform, while Windows is an
   exact-install consumer rather than a release builder.
+- 2026-08-31: Release Candidate run 33427136331 successfully built and uploaded the immutable
+  bundle, then both exact-install jobs rejected their newly installed `site-packages/humanhand`
+  because the clean venv intentionally lived under the repository-local `.cache` directory. The
+  source-tree guard compared against the entire repository instead of `src/humanhand`.
 
 ## 14. Decision Log
 
@@ -364,6 +368,11 @@ Acceptance requires every SPEC-027 criterion and:
   configuration with a contract test. Reason: the release specification forbids repository-control
   directories, and hosted run 33426054511 proved Hatch's default selection included one.
   Consequence: workflow definitions remain in source control but cannot enter the release payload.
+- 2026-08-31 — Scope the exact-install import guard to the source package directory
+  `src/humanhand`, while continuing to require the installed distribution version. Reason: a venv
+  under the repository-local cache is isolated from source imports but necessarily has a path below
+  the repository root. Consequence: genuine source imports still fail closed, and valid installed
+  `site-packages` imports are accepted on both platforms.
 
 ## 15. Outcomes & Retrospective
 

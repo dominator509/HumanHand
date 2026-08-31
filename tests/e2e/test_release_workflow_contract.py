@@ -4,6 +4,7 @@ from pathlib import Path
 
 WORKFLOW = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "release.yml"
 PYPROJECT = Path(__file__).resolve().parents[2] / "pyproject.toml"
+VERIFY_SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "verify-release-bundle.sh"
 
 
 def _workflow_text() -> str:
@@ -115,3 +116,11 @@ def test_sdist_excludes_github_control_plane() -> None:
 
     assert "[tool.hatch.build.targets.sdist]" in pyproject
     assert 'exclude = ["/.github"]' in pyproject
+
+
+def test_exact_install_rejects_source_package_not_repo_local_venv() -> None:
+    script = VERIFY_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'source_package = repository_root / "src" / "humanhand"' in script
+    assert "source_package in module_path.parents" in script
+    assert "repository_root in module_path.parents" not in script

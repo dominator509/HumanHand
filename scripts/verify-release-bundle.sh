@@ -99,7 +99,8 @@ import humanhand
 repository_root = Path(sys.argv[1]).resolve()
 expected_version = sys.argv[2]
 module_path = Path(humanhand.__file__).resolve()
-if module_path == repository_root or repository_root in module_path.parents:
+source_package = repository_root / "src" / "humanhand"
+if module_path == source_package or source_package in module_path.parents:
     raise SystemExit(f"HumanHand imported from repository checkout: {module_path}")
 if version("humanhand") != expected_version:
     raise SystemExit("installed distribution version mismatch")
