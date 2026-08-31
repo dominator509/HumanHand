@@ -320,6 +320,13 @@ Acceptance requires every SPEC-027 criterion and:
   the long-standing required-document list names missing root files `PRIVACY.md` and `SUPPORT.md`.
   Creating policy/support contracts is outside this CI remediation and would require maintainer
   content decisions, so Milestone 5 remains incomplete.
+- 2026-08-31: Release Candidate run 33426054511 cleared source verification, then rejected the
+  sdist because Hatch's default source selection included `.github/workflows/ci.yml`. The release
+  verifier correctly blocked the forbidden control-plane member before upload or matrix install.
+- 2026-08-31: The Windows-local release wrapper builds both payload sets but reports different
+  bytes; the Ubuntu hosted builder passed the same reproducibility comparison before inspecting its
+  sdist. Hosted Ubuntu remains the plan's authoritative build-once platform, while Windows is an
+  exact-install consumer rather than a release builder.
 
 ## 14. Decision Log
 
@@ -353,6 +360,10 @@ Acceptance requires every SPEC-027 criterion and:
   readiness wrapper pass. Reason: those documents require maintainer-owned operational and policy
   content, while the hosted CI/release workflows can validate the implementation independently.
   Consequence: production readiness remains fail-closed even if CI becomes green.
+- 2026-08-31 — Explicitly exclude `/.github` from the Hatch sdist target and cover the build
+  configuration with a contract test. Reason: the release specification forbids repository-control
+  directories, and hosted run 33426054511 proved Hatch's default selection included one.
+  Consequence: workflow definitions remain in source control but cannot enter the release payload.
 
 ## 15. Outcomes & Retrospective
 

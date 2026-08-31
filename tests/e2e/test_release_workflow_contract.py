@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 WORKFLOW = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "release.yml"
+PYPROJECT = Path(__file__).resolve().parents[2] / "pyproject.toml"
 
 
 def _workflow_text() -> str:
@@ -107,3 +108,10 @@ def test_release_workflow_contains_no_publish_or_release_action() -> None:
     )
     for value in forbidden:
         assert value not in lowered
+
+
+def test_sdist_excludes_github_control_plane() -> None:
+    pyproject = PYPROJECT.read_text(encoding="utf-8")
+
+    assert "[tool.hatch.build.targets.sdist]" in pyproject
+    assert 'exclude = ["/.github"]' in pyproject
