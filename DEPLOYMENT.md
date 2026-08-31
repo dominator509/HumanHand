@@ -1,100 +1,169 @@
 # Deployment
 
-## Deployment Environments
+## Deployment Model
 
-Human Hand has no hosted server deployment.
+HumanHand is a local Python 3.11 CLI. It has no hosted production server managed by this
+repository.
 
-| Environment | Meaning | Deployment Target |
+| Environment | Meaning | Deployment target |
 |---|---|---|
-| Local development | Repository checkout with uv | Developer or agent machine |
-| CI | GitHub Actions Windows/Ubuntu matrix | Ephemeral CI runners |
-| Release candidate | Built wheel/sdist installed into clean env | Maintainer machine or CI artifact |
-| Production | User-installed package | Windows 10/11 local PC; Linux/macOS best-effort |
+| Local development | Repository checkout with frozen uv environment. | Developer or agent machine. |
+| Source CI | Repository tests on ephemeral Ubuntu and Windows runners. | GitHub Actions. |
+| Automated release candidate | One retained release bundle installed unchanged on Ubuntu and Windows. | GitHub Actions artifact. |
+| Production | Maintainer-approved exact wheel installed by a user. | Windows 10/11; Linux supported by CI; macOS best effort unless separately tested. |
 
-## Deployment Architecture
+A source checkout, local `dist/` directory, or rebuilt wheel is not automatically the release
+artifact.
 
-- Build artifact: Python wheel and source distribution.
-- Install method: `pip install humanhand` after published, or `pip install dist/humanhand-*.whl` for local artifact.
-- Runtime: local single-process CLI.
-- Database: none; optional local SQLite cache only.
-- External services: user-configured LLM/detector endpoints.
+## Runtime Architecture
 
-## Build Artifact
+- Package: pure-Python wheel plus source distribution.
+- Install: exact wheel after checksum and manifest verification.
+- Runtime: local single-process CLI plus explicitly configured local/external adapters.
+- State: user-selected local project data and optional local caches; no hosted HumanHand database.
+- External services: used only when explicitly configured and permitted by project privacy policy.
 
-`sh scripts/build.sh` must create artifacts under `dist/` using `python -m build`. Artifacts must not contain `.env`, `.cache/`, test outputs, secrets, user text, or local detector/LLM responses.
+## Build-Once Artifact Flow
 
-## Release Flow
+1. Pin the full candidate commit SHA.
+2. Run `sh scripts/verify.sh` on that source candidate.
+3. Run `sh scripts/build-release-bundle.sh`.
+4. Require two independent same-source builds to produce byte-identical wheel and sdist digests.
+5. Verify the bundle manifest, package metadata, wheel `RECORD`, archive safety, forbidden content,
+   SBOM, provenance, and checksums.
+6. Retain the SHA-specific bundle in GitHub Actions.
+7. Download the same bundle in Ubuntu and Windows jobs.
+8. Install the exact wheel without rebuilding.
+9. Run installed-CLI smoke tests with synthetic data and isolated HOME/cache paths.
+10. Produce separate release-gate evidence.
+11. Publish only after explicit maintainer approval, using the already verified artifact bytes.
 
-1. Complete EP-001 through EP-010.
-2. Confirm `sh scripts/verify.sh` exits 0.
-3. Confirm `sh scripts/production-readiness-check.sh` exits 0.
-4. Confirm `sh scripts/loop.sh` prints `build: complete`.
-5. Build wheel/sdist with `sh scripts/build.sh`.
-6. Install wheel in a clean environment.
-7. Run post-install smoke tests.
-8. Prepare release notes and changelog.
-9. Obtain explicit maintainer approval for tag/publish.
-10. Publish manually only after approval.
+## Release Bundle
 
-## Deployment Steps
+Expected files:
 
-### Local Wheel Install
+```text
+humanhand-<version>-py3-none-any.whl
+humanhand-<version>.tar.gz
+runtime-requirements.txt
+sbom.cdx.json
+reproducibility.json
+release-provenance.json
+release-manifest.json
+SHA256SUMS
+```
 
-1. Run `sh scripts/build.sh`.
-2. Create clean Python 3.11 environment.
-3. Run `pip install dist/humanhand-*.whl`.
-4. Run `humanhand --version`.
-5. Run `humanhand --help`.
-6. Run a smoke rewrite/verify path using mocked/local endpoint or documented local fallback.
+Before installation:
 
-### PyPI Release
+```text
+sh scripts/verify-release-bundle.sh <bundle-directory> <candidate-sha>
+```
 
-PyPI publishing is manual and requires explicit maintainer approval. No CI workflow may auto-publish to PyPI.
+The verifier fails when the candidate SHA, checksum, package metadata, archive contents, dependency
+evidence, or provenance subjects do not match.
 
-## Migration Steps
+## Local Candidate Build
 
-No primary database migrations. Optional cache schema is created lazily. Cache rollback is deletion of `.cache/humanhand` or the configured cache file.
+From a clean repository checkout at the intended SHA:
 
-## Rollback Steps
+```text
+sh scripts/install.sh
+sh scripts/verify.sh
+sh scripts/build-release-bundle.sh
+sh scripts/verify-release-bundle.sh release-bundle "$(git rev-parse HEAD)"
+```
 
-- Application rollback: reinstall previous wheel version.
-- Config rollback: restore previous env/config values.
-- Cache rollback: delete local cache file; it contains no user text and can be rebuilt.
-- Release rollback: yank or supersede package only with maintainer decision.
+Local evidence is useful for diagnosis. The GitHub Release Candidate workflow remains the
+cross-platform automated artifact gate because it retains the bundle and installs identical bytes
+on both supported CI platforms.
 
-## Post-Deploy Smoke Tests
+## Maintainer Installation
 
-- `humanhand --version` exits 0 and prints version.
-- `humanhand --help` exits 0 and prints command help.
-- `humanhand scrub --audit <synthetic-file>` exits 0.
-- `humanhand diff-facts <synthetic-source> <synthetic-output>` exits 0.
-- `humanhand verify <synthetic-output>` exits 0 using local heuristic fallback when no provider key is configured.
-- Mocked/local rewrite path completes without printing generated prose to stdout unless `--print` is used.
+1. Download the retained SHA-specific release bundle from the successful workflow run.
+2. Record the workflow URL, artifact ID, artifact digest, candidate SHA, wheel digest, and sdist
+   digest.
+3. Verify the bundle against the candidate SHA.
+4. Create a clean Python 3.11 environment.
+5. Install runtime dependencies from `runtime-requirements.txt` with hash checking.
+6. Install the exact wheel with dependencies disabled so pip cannot substitute another build.
+7. Run installed smoke tests.
+8. Confirm `humanhand` imports from the installed environment rather than a source checkout.
 
-## Required Approvals
+Representative commands:
 
-Explicit maintainer approval is required for:
+```text
+python -m venv <venv>
+<venv-python> -m pip install --require-hashes -r runtime-requirements.txt
+<venv-python> -m pip install --no-deps --no-index humanhand-<version>-py3-none-any.whl
+humanhand --version
+humanhand --help
+humanhand health --json
+```
 
-- Git tags.
-- GitHub releases.
-- PyPI publishing.
-- Any live detector/LLM testing with paid accounts.
-- Any irreversible data or release action.
+## Publication
 
-## Deployment STOP Conditions
+PyPI, tags, and GitHub Releases are manual and require explicit maintainer approval. Publication
+must upload the exact verified wheel and sdist. Do not run a build command during publication.
 
-Stop when:
+If a publication system modifies or rebuilds the payload, the result is a new artifact and must
+repeat the artifact-dependent gates.
 
-- Release approval is missing.
-- Tests or production-readiness checks fail after bounded recovery.
-- Artifacts contain secrets, user text, `.env`, `.cache`, or unexpected files.
-- Wheel install fails in a clean environment.
-- Rollback path is not documented.
+## Configuration and Data
 
-## Production Verification
+- Never include `.env`, credentials, user text, project databases, caches, logs, or local model/API
+  responses in a release payload.
+- Store provider credentials through documented environment/secret mechanisms only.
+- Do not enable cloud submission silently.
+- Preserve user project data during application upgrades and rollback.
+- Validate schema migrations on copies or disposable synthetic fixtures before any user-data
+  migration.
 
-Production verification is local artifact verification, not server monitoring. It requires passing validation scripts, clean wheel install, smoke tests, docs review, security/privacy review, release notes, rollback instructions, and signed-off launch gate in EP-010.
+## Post-Deployment Smoke
 
-Pre-SLM integration remains local-first and has no hosted deployment target. EP-019 may
-verify packaging and project migration locally, but it cannot publish, tag, deploy, or
-introduce an SLM runtime.
+Using synthetic files only:
+
+- `humanhand --version` exits 0 and matches installed package metadata.
+- `humanhand --help` exits 0.
+- `humanhand health --json` exits 0 without exposing secrets.
+- local heuristic `verify --json` exits 0.
+- `diff-facts --json` exits 0.
+- `scrub --audit --json` exits 0.
+- imported module paths are outside the repository checkout.
+
+Live provider functionality requires authorized credentials and its own evidence. Mocked endpoints
+or local fallbacks do not prove a third-party production integration.
+
+## Rollback
+
+Rollback uses a previously retained or published known-good release bundle, not an unverified
+rebuild.
+
+1. Identify the known-good bundle by candidate SHA and wheel digest.
+2. Verify its checksums and manifest.
+3. Install the exact prior wheel in a clean environment or reinstall it into the supported target.
+4. Run post-install smoke tests.
+5. Preserve user data and project state.
+6. Document the reason, affected artifact digest, and result.
+
+See `ROLLBACK.md` for the complete procedure.
+
+## Deployment Stop Conditions
+
+Stop deployment when:
+
+- the intended candidate SHA is ambiguous;
+- source or release-candidate CI is not green;
+- the retained artifact cannot be downloaded or verified;
+- any checksum, manifest, provenance, RECORD, package metadata, or clean-install check fails;
+- the artifact differs from the one tested;
+- a critical/high finding lacks authorized resolution or acceptance;
+- required external, human, credentialed, destructive, or long-duration gates are unresolved;
+- rollback evidence is missing; or
+- maintainer approval is absent.
+
+## Evidence Boundary
+
+Successful automated artifact verification proves only the scope recorded in `RELEASE_GATE.json`.
+It does not establish provider availability, organization-wide compliance, human acceptance,
+production-scale SLOs, long-duration stability, disaster recovery, or professional certification
+unless those gates were separately executed with genuine evidence.

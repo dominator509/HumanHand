@@ -27,6 +27,9 @@ Use `uv` for development. End users install the built wheel with `pip`. Do not r
 | Integration tests | `sh scripts/test-integration.sh` | `integration tests: ok` |
 | E2E/acceptance tests | `sh scripts/test-e2e.sh` | `e2e tests: ok` |
 | Build wheel/sdist | `sh scripts/build.sh` | `build: ok` |
+| Build reproducible release bundle | `sh scripts/build-release-bundle.sh` | `release bundle build: ok` |
+| Verify exact release bundle | `sh scripts/verify-release-bundle.sh <bundle-dir> <expected-sha>` | `release bundle verify: ok` |
+| Focused release-artifact tests | `sh scripts/test-release-artifacts.sh` | `release artifacts: ok` |
 | Security check | `sh scripts/security-check.sh` | `security check: ok` |
 | Dependency audit | `sh scripts/dependency-audit.sh` | `dependency audit: ok` |
 | Smoke test | `sh scripts/smoke-test.sh` | `smoke test: ok` |
@@ -94,6 +97,7 @@ Use `uv` for development. End users install the built wheel with `pip`. Do not r
 - After EP-013, `sh scripts/cli.sh import source <path>` and `sh scripts/cli.sh import style <path>` must pass.
 - After EP-014, `sh scripts/cli.sh style review <import-id>`, `style profile <label>`, `style coverage <label>`, `style invariants <label>`, and `style compare <label> <document>` must pass.
 - After EP-015, `sh scripts/cli.sh project init <directory> --name <name>`, `project status`, `project ingest <package.json>`, `project revisions`, `project export-obsidian <vault> --document <package.json>`, `context preview --project <directory> --block <id> --document <package.json>`, and `context validate <capsule.json>` must pass.
+- After EP-029, `sh scripts/build-release-bundle.sh`, `sh scripts/verify-release-bundle.sh <bundle-dir> <expected-sha>`, and `sh scripts/test-release-artifacts.sh` must pass. The GitHub Release Candidate workflow must install the same retained bundle on Ubuntu and Windows without rebuilding it.
 
 ## Environment-Gated Commands
 

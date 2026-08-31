@@ -1,152 +1,227 @@
 # Production Readiness
 
-## Definition of Production Readiness
+## Readiness Is Evidence-Scoped
 
-Human Hand is production-ready when all ExecPlans EP-000 through EP-010 are complete, all specs are satisfied, `sh scripts/verify.sh` exits 0, `sh scripts/production-readiness-check.sh` exits 0, `sh scripts/loop.sh` prints `build: complete`, the wheel installs cleanly, post-install smoke tests pass, privacy/security checks pass, and remaining risks are documented with explicit acceptance.
+HumanHand production readiness is not established by one green test suite or by the existence of
+code. A release decision must identify the exact source candidate, exact installable artifact,
+execution environment, evidence, unresolved risks, and external gates.
+
+The readiness model has three independent layers:
+
+1. **Source-candidate readiness** — repository lint, formatting, typing, unit, integration, E2E,
+   security, dependency, smoke, and coverage gates pass at a pinned commit.
+2. **Exact-artifact readiness** — one immutable wheel/sdist bundle is reproducibly built, inspected,
+   retained, installed unchanged on Ubuntu and Windows, and verified through synthetic installed
+   smoke tests.
+3. **External/product-context readiness** — applicable live-provider, production-like, sustained
+   performance, destructive recovery, hardware, human, accessibility, security, legal, and
+   compliance gates have genuine evidence.
+
+Passing layers 1 and 2 supports the scoped term **automated release candidate**. It does not by
+itself prove layer 3 or authorize publication.
+
+## Candidate and Artifact Identity
+
+Every decision records:
+
+- full candidate commit SHA;
+- package version;
+- workflow run identity;
+- retained artifact name, ID, URL, and platform-provided digest when available;
+- wheel and sdist SHA-256 digests;
+- release-manifest digest;
+- SBOM and provenance evidence;
+- operating systems and Python versions tested; and
+- exact unresolved external/deferred gates.
+
+A rebuild creates a new artifact identity and invalidates artifact-dependent evidence.
+
+## Source-Candidate Gates
+
+The pinned candidate must pass without weakening existing thresholds:
+
+- preflight;
+- Ruff lint and formatting;
+- strict mypy;
+- unit tests;
+- integration tests;
+- importer tests;
+- full E2E and pre-SLM E2E tests;
+- Bandit and repository secret-pattern checks;
+- dependency vulnerability audit;
+- build and source-tree smoke tests;
+- at least the configured branch coverage threshold; and
+- documentation/control-plane consistency tests.
+
+Mocks, stubs, fake providers, and local fallbacks demonstrate only the mocked/local code path. They
+do not prove a real external integration.
+
+## Exact-Artifact Gates
+
+The Release Candidate workflow must:
+
+- check out the explicit candidate SHA;
+- build the wheel and sdist twice under deterministic inputs;
+- require byte-identical matching artifacts;
+- inspect archives for traversal, links, devices, forbidden files, metadata inconsistencies, and
+  package-layout defects;
+- verify every wheel `RECORD` digest and size;
+- export frozen hash-locked runtime dependencies;
+- export a CycloneDX 1.5 SBOM from `uv.lock`;
+- create checksum, reproducibility, and honest unsigned provenance evidence;
+- upload one SHA-specific immutable bundle;
+- download the same bundle in Ubuntu and Windows jobs;
+- verify all digests before installation;
+- install dependencies with hash checking and the exact wheel with dependency resolution disabled;
+- prove imports originate from the clean environment rather than the repository checkout;
+- run installed CLI smoke tests with synthetic data;
+- retain the release bundle and a separate `RELEASE_GATE.json`; and
+- report `humanhand/release-candidate` status on the candidate commit.
+
+The workflow must never publish, tag, deploy, or promote automatically.
 
 ## Functional Readiness
 
-- `humanhand rewrite` reads source/style, preserves facts, matches style, scrubs metadata, writes UTF-8 LF output, and does not print generated prose without `--print`.
-- `humanhand verify` returns detector or local heuristic scoring without requiring paid accounts by default.
-- `humanhand diff-facts` identifies omissions, additions, contradictions, and preserved anchors.
-- `humanhand scrub --audit` audits metadata markers without modifying input.
-- `humanhand health --json`, `--help`, and `--version` work.
-- Non-goals remain excluded.
+Applicable implemented workflows must show executed evidence for:
 
-## Test Readiness
+- clean source and style import boundaries;
+- authorship review and style-evidence handling;
+- project/revision persistence;
+- context construction;
+- deterministic lexical proposal and human decision flow;
+- fact, citation, quotation, protected-span, and structure checks;
+- clean TXT/Markdown/DOCX/PDF export and independent artifact audit;
+- privacy-mode enforcement; and
+- backwards-compatible established CLI commands.
 
-- Lint passes.
-- Format check passes.
-- Typecheck passes.
-- Unit tests pass.
-- Integration tests pass.
-- E2E tests pass without live network by default.
-- Build passes.
-- Security check passes.
-- Dependency audit is reviewed.
-- Smoke tests pass under 30 seconds on mocks.
-- Coverage is at least 85% after EP-007.
-- Live tests are gated and skipped unless explicitly enabled.
+Planned SLM/DeepSeek/Forge features are not functional until their ExecPlans are implemented and
+validated. Planning documents are not execution evidence.
 
-## Security Readiness
+## Security and Privacy Readiness
 
-- No secrets in repository, logs, artifacts, or fixtures.
-- `.env` ignored.
-- Redaction filters tested.
-- User text never logged or cached.
-- Output scrub before write tested.
-- Strict UTF-8 and BOM rejection tested.
-- Insecure endpoints rejected unless explicitly allowed.
-- LLM/detector schemas validated.
-- Bandit and pip-audit pass or findings are documented and accepted.
+At minimum:
 
-## Privacy Readiness
+- no real secrets or user documents in repository, fixtures, logs, caches, workflow artifacts, or
+  release payloads;
+- `.env*`, local databases, caches, bytecode, logs, and key material rejected from release archives;
+- external endpoints fail closed under documented transport and privacy rules;
+- strict response parsing and bounded retries;
+- user text excluded from routine logs;
+- private retained content protected by the selected privacy policy and key provider;
+- cloud use explicit, optional, and blocked in strict-local mode;
+- active document content never executed by importers;
+- untrusted file parsing bounded and isolated to the documented degree; and
+- security scanners treated as inputs, not proof that vulnerabilities are absent.
 
-- No telemetry, phone-home, remote metrics, or cloud database.
-- Third-party endpoint privacy implications documented.
-- Local endpoint option documented.
-- Cache stores detector score metadata only.
-- Tests inspect cache for no text.
-- README states users are responsible for legal/ethical use.
+## Data and Migration Readiness
 
-## Performance Readiness
+Where project storage is applicable:
 
-- Smoke under 30 seconds.
-- `--help` and `--version` first byte target documented and tested where practical.
-- Default input cap 200,000 characters enforced.
-- External timeout default 30 seconds.
-- Retry cap of 3 attempts enforced.
-- Logging overhead target assessed in EP-008/EP-010.
+- schema versions and migration ownership are explicit;
+- migration tests cover success, stale version, invalid state, and rollback/recovery behavior;
+- accepted revisions remain immutable;
+- input documents are not overwritten;
+- export writes only to the requested output path;
+- failure cannot silently substitute fake persistence; and
+- rollback preserves user project data.
 
-## Accessibility Readiness
+A statement such as “no database” must not be used when current project features persist state.
+Optional caches and project stores must be documented separately.
 
-- CLI output is predictable and screen-reader friendly.
-- stdout and stderr are separated.
-- JSON mode prints JSON-only stdout.
-- `--no-color` and `NO_COLOR` honored.
-- No spinners.
-- Empty input errors are one-line and actionable.
+## Compatibility Readiness
 
-## Observability Readiness
+Automated evidence currently covers Python 3.11 on Ubuntu and Windows for source and exact wheel
+installation. Other operating systems, Python versions, physical hardware, private networks,
+provider versions, or future model runtimes remain conditional until tested.
 
-- Structured JSONL logs to stderr.
-- Required fields implemented.
-- Redaction tests pass.
-- Local counters emitted.
-- Health command implemented.
-- No remote telemetry.
+Upgrade, downgrade, version-skew, and rollback gates apply when the corresponding released
+versions and state transitions exist. Missing prior artifacts or environments are blockers, not
+not-applicable results.
 
-## Deployment Readiness
+## Observability and Support Readiness
 
-- Wheel and sdist build.
-- Wheel installs in clean Python 3.11 env.
-- Console script `humanhand` works.
-- README install steps validated.
-- GitHub Actions CI matrix exists.
-- Manual release workflow exists and does not auto-publish.
+- Human-readable CLI errors are actionable and do not expose secrets or user text.
+- JSON output remains machine-readable and stdout/stderr contracts are tested.
+- Health output accurately distinguishes configured, local, unavailable, and unverified components.
+- Workflow evidence identifies exact failures and preserves first failure logs.
+- A classic commit status makes the release-candidate result observable even when Actions-log API
+  access is unavailable.
+- Operations, support, deployment, release, and rollback documentation match actual behavior.
+- Support procedures do not request private documents or credentials.
 
-## Rollback Readiness
+## Performance and Long-Duration Gates
 
-- Previous wheel reinstall documented.
-- Config rollback documented.
-- Cache deletion documented.
-- Release rollback/yank requires maintainer decision.
-- Rollback smoke tests documented.
+Short local smoke performance is not a substitute for:
 
-## Data Readiness
+- representative workload benchmarks;
+- declared SLOs;
+- sustained concurrency;
+- 24/48/72-hour soak;
+- resource-leak detection;
+- exhaustion and stress behavior;
+- fault injection; or
+- recovery timing and RPO/RTO verification.
 
-- No primary database.
-- Cache schema versioned.
-- No user text in cache.
-- Cache can be deleted safely.
-- Input files read-only.
-- Output writes only to requested path.
+Without a persistent representative runner, these remain `DEFERRED_LONG_RUNNING` or
+`EXTERNAL_REQUIRED` when applicable.
 
-## Documentation Readiness
+## Human and Professional Gates
 
-- README covers install, commands, privacy, endpoint configuration, detector fallback, and ethical responsibility.
-- CHANGELOG exists.
-- Docs here are updated.
-- Specs match behavior.
-- ExecPlans are complete.
-- Release notes prepared.
+No automated agent may fabricate:
 
-## Support Readiness
+- human UAT approval;
+- manual screen-reader or assistive-technology results;
+- accessibility conformance;
+- penetration-test conclusions;
+- HIPAA or other regulatory compliance;
+- legal review;
+- certification; or
+- external auditor sign-off.
 
-- Operations runbook exists.
-- Incident response checklist exists.
-- Troubleshooting docs avoid collecting real user text.
-- Maintainer approval gates documented.
+These remain external gates until the appropriate person or organization completes them.
 
-## Final Launch Gate
+## Release Blocking Conditions
 
-EP-010 must record:
+The release remains blocked when any of the following is true:
 
-- Commands run and results.
-- Artifact names and hashes if available.
-- Changed files review.
-- Security/privacy review result.
-- Performance review result.
-- Remaining risks.
-- Maintainer approval status for release/publish.
+- candidate or artifact identity is ambiguous;
+- source verification fails;
+- builds are not byte-identical;
+- artifact inspection, checksums, dependency export, SBOM, provenance, or clean installation fails;
+- Ubuntu or Windows exact-artifact smoke fails;
+- the artifact tested differs from the artifact proposed for publication;
+- a critical advertised feature is stubbed, simulated, disconnected, or unproven;
+- a release-blocking critical/high finding is unresolved without authorized acceptance;
+- applicable external gates remain incomplete; or
+- maintainer approval is absent.
 
-## Checklist
+## Automated Release-Candidate Checklist
 
-- [x] EP-000 through EP-010 complete.
-- [x] `sh scripts/verify.sh` passes.
-- [x] `sh scripts/production-readiness-check.sh` passes.
-- [x] `sh scripts/loop.sh` prints `build: complete`.
-- [x] Wheel/sdist built.
-- [x] Clean install smoke passes.
-- [x] No secrets or user text leaks.
-- [x] README/CHANGELOG/release notes updated.
-- [x] Rollback drill documented.
-- [x] Final Decision Log entry added.
+- [ ] Candidate SHA pinned.
+- [ ] Source verification passes.
+- [ ] Two builds are byte-identical.
+- [ ] Archive and package metadata inspection passes.
+- [ ] Frozen dependency and CycloneDX evidence is present.
+- [ ] Checksums and provenance subjects match payload bytes.
+- [ ] One immutable SHA-specific artifact is retained.
+- [ ] Exact wheel installs and passes smoke on Ubuntu.
+- [ ] Exact wheel installs and passes smoke on Windows.
+- [ ] Separate release-gate evidence is retained.
+- [ ] No publication or deployment occurred.
+- [ ] Residual external/deferred gates are explicit.
 
-## Pre-SLM Readiness
+The checklist is completed by evidence from a specific workflow run; it is not permanently checked
+inside this source document.
 
-The EP-010 checklist is the compatibility baseline. The separate Pre-SLM gate is not
-complete until EP-011 through EP-019 are audited, deterministic import/style/fact/
-privacy/export/lexical/Beacon checks pass, backward compatibility remains green, and
-no model or training implementation exists. License choice, publication, live service
-accounts, and deployment remain maintainer-owned decisions.
+## Final Decision Vocabulary
+
+Use only:
+
+- `GO` — all applicable release-blocking automated, human, and external gates completed;
+- `NO_GO` — an applicable release-blocking criterion failed;
+- `CONDITIONAL_EXTERNAL_GATES` — automated gates passed but explicitly applicable external gates
+  remain; or
+- `INCONCLUSIVE` — evidence is insufficient to determine readiness.
+
+`RELEASE_GATE.json` intentionally reports an **automated exact-artifact release candidate** result,
+not an organization-wide `GO` verdict.
