@@ -214,6 +214,12 @@ class TestBuildSourceEvidence:
         assert SpanKind.CITATION in kinds
         assert evidence.citations
 
+    def test_extracts_month_first_date(self) -> None:
+        document = _document(text="The deadline is August 30, 2026.")
+        evidence = build_source_evidence(document)  # type: ignore[arg-type]
+        dates = [s.text for s in evidence.protected_spans.spans if s.kind is SpanKind.DATE]
+        assert dates == ["August 30, 2026"]
+
     def test_quotation_spans_and_evidence_agree(self) -> None:
         text = 'He said "this is a reasonably long quoted sentence" [1].'
         document = _document(text=text)

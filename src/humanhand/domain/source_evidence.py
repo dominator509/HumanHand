@@ -24,7 +24,9 @@ _NUMBER_UNIT_RE = re.compile(r"\b(\d+(?:[.,]\d+)?)\s*([A-Za-zÀ-ſµΩ°%]{1,12}
 _DATE_RE = re.compile(
     r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|"
     r"\d{1,2}\s+(?:January|February|March|April|May|June|July|August|"
-    r"September|October|November|December)\s+\d{4})\b"
+    r"September|October|November|December)\s+\d{4}|"
+    r"(?:January|February|March|April|May|June|July|August|September|"
+    r"October|November|December)\s+\d{1,2},?\s+\d{4})\b"
 )
 
 _MEASURE_STOPWORDS = frozenset(
